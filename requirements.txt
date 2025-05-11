@@ -1,4 +1,9 @@
+gpytorch
 jupyter
 jupyterlab
 jupyterlab-git
 jupytext
+matplotlib
+scipy
+scikit-learn
+torch

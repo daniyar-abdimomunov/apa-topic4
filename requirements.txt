@@ -6,6 +6,7 @@ jupytext
 matplotlib
 pandas
 properscoring
+seaborn
 scipy
 scikit-learn
 torch

@@ -4,6 +4,8 @@ jupyterlab
 jupyterlab-git
 jupytext
 matplotlib
+pandas
+properscoring
 scipy
 scikit-learn
 torch

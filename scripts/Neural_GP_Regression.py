@@ -1,17 +1,3 @@
-# ---
-# jupyter:
-#   jupytext:
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.17.1
-#   kernelspec:
-#     display_name: Python 3
-#     language: python
-#     name: python3
-# ---
-
 # %% [markdown]
 # This notebook consists of three sections:
 # - Introduction to Gaussian Processes
@@ -634,7 +620,7 @@ class Exact_GPRegressionModel(gpytorch.models.ExactGP):
         covar_x = univariate_covars.sum(dim=-3)
         
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
-        
+
 
 # %%
 #initialize the model and the device to train the neural GP on:
@@ -692,7 +678,7 @@ for i in range(0,training_iterations):
             epoch_loss.append(loss.item())
 
     print('Training Iteration/Epoch : ',i,', Loss Value: ',np.mean(epoch_loss))
-            
+
 
 # %%
 import matplotlib.pyplot as plt

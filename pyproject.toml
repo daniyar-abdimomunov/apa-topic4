@@ -5,3 +5,6 @@ name = "apa-topic4"
 [tool.jupytext.formats]
 "notebooks/" = "ipynb"
 "scripts/" = "py:percent"
+
+[tool.jupytext]
+notebook_metadata_filter="-all"

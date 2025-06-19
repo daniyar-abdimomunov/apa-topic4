@@ -10,6 +10,7 @@ import pickle
 from sklearn.preprocessing import StandardScaler
 import sys
 import torch
+from transformers import AutoModelForCausalLM
 
 PROJECT_ROOT = os.path.dirname(os.getcwd())
 sys.path.insert(0, PROJECT_ROOT)
@@ -148,3 +149,54 @@ np.savetxt(os.path.join(DATA_DIR, 'dnn_uppers.csv'), dnn_uppers, delimiter=",")
 # %%
 # TO-DO: train LLMTime model and export predictions
 ...
+
+# %% [markdown]
+# ## 2.5 Sundial Model
+# Sundial is a pre-trained model for Time-Series Forecasting.
+# This section is adapted from the [quickstart_zero_shot.ipynb](https://github.com/thuml/Sundial/blob/main/examples/quickstart_zero_shot.ipynb) provided by the developers of the Sundial Model.
+
+# %%
+# load model and dataset
+model = AutoModelForCausalLM.from_pretrained('thuml/sundial-base-128m', trust_remote_code=True)
+df = pd.read_csv("https://raw.githubusercontent.com/WenWeiTHU/TimeSeriesDatasets/refs/heads/main/ETT-small/ETTh2.csv")
+
+# %%
+# forecasting configurations
+NUM_SAMPLES = 20           # generate 20 samples
+forecast = model.generate(test_input, max_new_tokens=HORIZON, num_samples=NUM_SAMPLES) # generate 20 probable predictions
+print(f'Predictions shape: {forecast.shape}\n'
+      f'{forecast.shape[0]} - test cases\n'
+      f'{forecast.shape[1]} - prediction samples\n'
+      f'{forecast.shape[2]} - predicted time-steps (i.e. prediction horizon)\n')
+
+# %%
+# separate predictions and confidence interval
+sundial_preds = scaler.inverse_transform(forecast.mean(dim=1))
+sundial_lowers = scaler.inverse_transform(forecast.quantile(q=0.05, dim=1))
+sundial_uppers = scaler.inverse_transform(forecast.quantile(q=0.95, dim=1))
+
+# %%
+# export forecast outputs for benchmarking
+np.savetxt('../data/sundial_preds.csv',sundial_preds,delimiter=",")
+np.savetxt('../data/sundial_lowers.csv',sundial_lowers,delimiter=",")
+np.savetxt('../data/sundial_uppers.csv',sundial_uppers,delimiter=",")
+
+# %%
+# visualize raw predictions
+TEST_CASE = 666
+
+plt.figure(figsize=(15, 5))
+plt.xlim(0, LOOKBACK + HORIZON)
+plt.plot(np.arange(LOOKBACK), test_input[TEST_CASE], color='black')
+plt.plot(np.arange(LOOKBACK, LOOKBACK + HORIZON), forecast[TEST_CASE].transpose(1, 0))
+plt.grid()
+plt.show()
+
+# %%
+# visualize predictions and confidence interval
+plot_predictions(
+    scaler.inverse_transform(test_input.numpy())[TEST_CASE],
+    scaler.inverse_transform(test_true.numpy())[TEST_CASE],
+    sundial_preds[TEST_CASE],
+    sundial_lowers[TEST_CASE],
+    sundial_uppers[TEST_CASE])

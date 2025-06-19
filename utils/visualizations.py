@@ -63,3 +63,31 @@ def compare_predictions(x_input, y_input, x, y_true, benchmarking: dict) -> Tupl
     plt.legend()
     plt.tight_layout()
     return fig, ax
+
+def plot_predictions(
+        input:np.ndarray,
+        true:np.ndarray,
+        pred:np.ndarray,
+        lower:np.ndarray=None,
+        upper:np.ndarray=None):
+    x_input = list(range(-input.shape[0], 0))
+    x_true = list(range(true.shape[0]))
+
+    # Initialize plot
+    f, ax = plt.subplots(1, 1, figsize=(14, 5))
+
+    # Plot training data as black stars
+    ax.plot(x_input, input, 'g')
+    # Plot predictive means as blue line
+    ax.plot(x_true, true, 'r.', alpha=0.5)
+    # Plot predictive means as blue line
+    ax.plot(x_true, pred, 'b')
+    # Shade between the lower and upper confidence bounds
+    ax.fill_between(x=x_true, y1=lower, y2=upper, alpha=0.5)
+    ax.set_xlabel('Time Steps')
+    ax.set_ylabel('Price (EUR/MWhe)')
+    #ax.set_xlim(-10, 20)
+    ax.set_ylim([-20, 210])
+    ax.legend(['Input Data', 'Observed Data', 'Prediction', 'Confidence Interval'])
+    plt.show()
+    return

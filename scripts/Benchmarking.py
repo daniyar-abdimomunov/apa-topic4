@@ -21,41 +21,67 @@ from __init__ import *
 DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
 
 # %%
-x_input = np.array(range(176))
-y_input = true = np.genfromtxt(os.path.join(DATA_DIR, 'example_input.csv'), delimiter=',')
-x = 176 + np.array(range(24))
-true = np.genfromtxt(os.path.join(DATA_DIR, 'example_true.csv') , delimiter=',')
-print(f'shape of x_input: {x_input.shape}\n'
-      f'shape of y_input: {y_input.shape}\n'
-      f'shape of x: {x.shape}\n'
-      f'shape of true: {true.shape}\n')
+inputs = np.genfromtxt(os.path.join(DATA_DIR, 'inputs.csv'), delimiter=',')
+trues = np.genfromtxt(os.path.join(DATA_DIR, 'trues.csv') , delimiter=',')
+print(f'shape of inputs: {inputs.shape}\n'
+      f'shape of trues: {trues.shape}\n')
 
 # %%
-pred_dist = np.genfromtxt(os.path.join(DATA_DIR, 'example_pred_dist.csv') , delimiter=',')
-pred_lower_dist = np.genfromtxt(os.path.join(DATA_DIR, 'example_pred_lower_dist.csv') , delimiter=',')
-pred_upper_dist = np.genfromtxt(os.path.join(DATA_DIR, 'example_pred_upper_dist.csv') , delimiter=',')
-print(f'shape of true: {true.shape}\n'
-      f'shape of pred_dist: {pred_dist.shape}\n'
-      f'shape of pred_lower_dist: {pred_lower_dist.shape}\n'
-      f'shape of pred_upper_dist: {pred_upper_dist.shape}')
+ts_mixer_preds = np.genfromtxt(os.path.join(DATA_DIR, 'ts_mixer_pred.csv') , delimiter=',')
+print(f'shape of trues: {trues.shape}\n'
+      f'shape of preds: {ts_mixer_preds.shape}\n')
 
 # %%
-deterministic_pred = pred_dist.mean(axis=1) + np.random.normal(0,1,len(pred_dist))
-print(f'shape of true: {true.shape}\n'
-      f'shape of pred_dist: {deterministic_pred.shape}\n')
+patch_tst_preds = np.genfromtxt(os.path.join(DATA_DIR, 'patch_TST_pred.csv') , delimiter=',')
+print(f'shape of trues: {trues.shape}\n'
+      f'shape of preds: {ts_mixer_preds.shape}\n')
+
+# %%
+sundial_preds = np.genfromtxt(os.path.join(DATA_DIR, 'sundial_preds.csv') , delimiter=',')
+sundial_lowers = np.genfromtxt(os.path.join(DATA_DIR, 'sundial_lowers.csv') , delimiter=',')
+sundial_uppers = np.genfromtxt(os.path.join(DATA_DIR, 'sundial_uppers.csv') , delimiter=',')
+print(f'shape of trues: {trues.shape}\n'
+      f'shape of preds: {sundial_preds.shape}\n'
+      f'shape of lowers: {sundial_lowers.shape}\n'
+      f'shape of uppers: {sundial_uppers.shape}')
+
+# %%
+gp_preds = np.genfromtxt(os.path.join(DATA_DIR, 'mt_batch_ts_gp_preds.csv') , delimiter=',')
+gp_lowers = np.genfromtxt(os.path.join(DATA_DIR, 'mt_batch_ts_gp_lowers.csv') , delimiter=',')
+gp_uppers = np.genfromtxt(os.path.join(DATA_DIR, 'mt_batch_ts_gp_uppers.csv') , delimiter=',')
+print(f'shape of true: {trues.shape}\n'
+      f'shape of preds: {gp_preds.shape}\n'
+      f'shape of lowers: {gp_lowers.shape}\n'
+      f'shape of uppers: {gp_uppers.shape}')
 
 # %%
 benchmarking = {
-      'deterministic_model': {
-            'name': 'DeterministicModel',
-            'pred': deterministic_pred,
+      'ts_mixer': {
+            'name': 'TS Mixer',
+            'pred': ts_mixer_preds,
+            'lower': None,
+            'upper': None,
+            'metrics': dict()
+      },
+      'patch_tst': {
+            'name': 'Patch TST',
+            'pred': patch_tst_preds,
+            'lower': None,
+            'upper': None,
+            'metrics': dict()
+      },
+      'sundial': {
+            'name': 'Sundial',
+            'pred': sundial_preds,
+            'lower': sundial_lowers,
+            'upper': sundial_uppers,
             'metrics': dict(),
       },
       'timeseries_gp': {
-            'name': 'TimeSeriesGP',
-            'pred': pred_dist,
-            'lower': pred_lower_dist,
-            'upper': pred_upper_dist,
+            'name': 'Time-series GP',
+            'pred': gp_preds,
+            'lower': gp_lowers,
+            'upper': gp_uppers,
             'metrics': dict(),
       },
 }
@@ -64,31 +90,24 @@ benchmarking = {
 # ## 2. Calculate Benchmark Metrics
 
 # %%
-benchmarking['deterministic_model']['metrics']['rmse'] = calculate_rmse(true, deterministic_pred)
-benchmarking['timeseries_gp']['metrics']['rmse'] = calculate_rmse(true, pred_dist)
-
-print(f"{benchmarking['deterministic_model']['name']} RMSE: {benchmarking['deterministic_model']['metrics']['rmse']}\n"
-      f"{benchmarking['timeseries_gp']['name']} RMSE: {benchmarking['timeseries_gp']['metrics']['rmse']}")
+for model in benchmarking.keys():
+      benchmarking[model]['metrics']['rmse'] = calculate_rmse(trues, benchmarking[model]['pred'])
+      print(f"{benchmarking[model]['name']} RMSE: {benchmarking[model]['metrics']['rmse']}")
 
 # %%
-benchmarking['deterministic_model']['metrics']['mape'] = calculate_mape(true, deterministic_pred)
-benchmarking['timeseries_gp']['metrics']['mape'] = calculate_mape(true, pred_dist)
-
-print(f"{benchmarking['deterministic_model']['name']} MAPE: {benchmarking['deterministic_model']['metrics']['mape']}\n"
-      f"{benchmarking['timeseries_gp']['name']} MAPE: {benchmarking['timeseries_gp']['metrics']['mape']}")
+for model in benchmarking.keys():
+      benchmarking[model]['metrics']['mape'] = calculate_mape(trues, benchmarking[model]['pred'])
+      print(f"{benchmarking[model]['name']} MAPE: {benchmarking[model]['metrics']['mape']}")
 
 # %%
-benchmarking['deterministic_model']['metrics']['picp'] = calculate_picp(true, deterministic_pred, deterministic_pred)
-benchmarking['timeseries_gp']['metrics']['picp'] = calculate_picp(true, pred_lower_dist, pred_upper_dist)
-
-print(f"{benchmarking['deterministic_model']['name']} PICP: {benchmarking['deterministic_model']['metrics']['picp']}\n"
-      f"{benchmarking['timeseries_gp']['name']} PICP: {benchmarking['timeseries_gp']['metrics']['picp']}")
+for model in benchmarking.keys():
+      benchmarking[model]['metrics']['picp'] = calculate_picp(trues, benchmarking[model]['lower'], benchmarking[model]['upper'])
+      print(f"{benchmarking[model]['name']} PICP: {benchmarking[model]['metrics']['picp']}")
 
 # %%
-benchmarking['deterministic_model']['metrics']['crps'] = calculate_crps(true, deterministic_pred)
-benchmarking['timeseries_gp']['metrics']['crps'] = calculate_crps(true, pred_dist)
-print(f"{benchmarking['deterministic_model']['name']} CRPS: {round(benchmarking['deterministic_model']['metrics']['crps'], 2)}\n"
-      f"{benchmarking['timeseries_gp']['name']} CRPS: {round(benchmarking['timeseries_gp']['metrics']['crps'], 2)}")
+for model in benchmarking.keys():
+      benchmarking[model]['metrics']['crps'] = calculate_crps(trues, benchmarking[model]['pred'])
+      print(f"{benchmarking[model]['name']} CRPS: {benchmarking[model]['metrics']['crps']}")
 
 # %%
 benchmarking_scores = dict()
@@ -101,9 +120,15 @@ pd.DataFrame.from_dict(benchmarking_scores, orient='index')
 # ## 3. Benchmark Scores and Predictions Evaluation
 
 # %%
-fig, ax = compare_scores(benchmarking)
+figures = compare_scores(benchmarking)
 plt.show()
 
 # %%
-fig, ax = compare_predictions(x_input, y_input, x, true, benchmarking)
+fig, ax = compare_single_prediction(inputs, trues, benchmarking, test_case = 488)
+plt.show()
+
+# %%
+test_cases = [0, 178, 367, 711]
+
+fig, axs = compare_multi_predictions(inputs, trues, benchmarking, test_cases = test_cases)
 plt.show()

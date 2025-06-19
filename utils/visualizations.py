@@ -35,31 +35,36 @@ def compare_scores(benchmarking: Dict[str,Dict[str,Any]]) -> Tuple[plt.Figure, A
         plt.xticks(rotation=0)
         plt.tight_layout()
         figures[metric]=(fig,ax)
-    return figures 
+    return figures
 
 
 
 # TO-DO: Create visualizations comparing predictions of different models
-def compare_predictions(x_input, y_input, x, y_true, benchmarking: dict) -> Tuple[plt.Figure, Any]:
+def compare_single_prediction(y_input, y_true, benchmarking: dict, test_case: int) -> Tuple[plt.Figure, Any]:
     ...
     fig, ax = plt.subplots(figsize=(10,6))
+    y_input = y_input[test_case]
+    y_true = y_true[test_case]
+    x_input = list(range(-y_input.shape[0], 0))
+    x = list(range(y_true.shape[0]))
 
-    plt.plot(x_input, y_input, label='Input Data',linestyle='--',color='gray')
-    plt.plot(x, y_true, 'k-', label='Observed Data')
+    plt.plot(x_input, y_input, 'k-',label='Input Data')
+    plt.plot(x, y_true, '.', label='Observed Data', color='red')
 
     for model_key,model in benchmarking.items():
-        pred = _reduce_dimension(model['pred'] )
         is_probabilistic = 'lower' in model and 'upper' in model
 
-        lower = _reduce_dimension(model['lower']) if is_probabilistic else None
-        upper = _reduce_dimension(model['upper']) if is_probabilistic else None
+        lower = _reduce_dimension(model['lower'][test_case]) if is_probabilistic else None
+        upper = _reduce_dimension(model['upper'][test_case]) if is_probabilistic else None
         plt.fill_between(x=x, y1=lower, y2=upper, alpha=0.4) if is_probabilistic else None
 
-        pred = _reduce_dimension(model['pred'])
+        pred = _reduce_dimension(model['pred'][test_case])
         plt.plot(x, pred, label=model['name'])
-    ax.set_title("Model Forecast comparison")
-    ax.set_ylabel('Price (EUR/MWhe)')
-    ax.set_xlabel("time")
+
+    ax.set_title(f"Model Forecast comparison\n"
+                 f"Test Case: #{test_case}")
+    ax.set_ylabel("Price (EUR/MWhe)")
+    ax.set_xlabel("Time-steps")
     plt.legend()
     plt.tight_layout()
     return fig, ax
@@ -91,3 +96,36 @@ def plot_predictions(
     ax.legend(['Input Data', 'Observed Data', 'Prediction', 'Confidence Interval'])
     plt.show()
     return
+
+def compare_multi_predictions(y_inputs, y_trues, benchmarking: dict, test_cases: list[int]) -> Tuple[plt.Figure, Any]:
+    fig, axs = plt.subplots(nrows=len(benchmarking.keys()), ncols=len(test_cases),  figsize=(24,9), sharex=True, sharey=True, layout='tight')
+
+    for i, (model_key, model) in enumerate(benchmarking.items()):
+        for j, test_case in enumerate(test_cases):
+            ax = axs[i, j]
+            if j == 0:
+                ax.set_ylabel(model['name'], size=18)
+            if i == 0:
+                ax.set_title(f'Test Case: #{test_case}', size=18)
+            y_input = y_inputs[test_case]
+            y_true = y_trues[test_case]
+            x_input = list(range(-y_input.shape[0], 0))
+            x = list(range(y_true.shape[0]))
+
+            ax.plot(x_input, y_input, 'k-', label='Input Data')
+            ax.plot(x, y_true, '.', label='Observed Data', color='red')
+
+            if 'lower' in model and 'upper' in model:
+                lower = _reduce_dimension(model['lower'][test_case])
+                upper = _reduce_dimension(model['upper'][test_case])
+                ax.fill_between(x=x, y1=lower, y2=upper, alpha=0.4, label='Confidence Interval')
+
+            pred = _reduce_dimension(model['pred'][test_case])
+            ax.plot(x, pred, label='Prediction')
+
+    fig.suptitle(f"Model Forecast comparison", size=28)
+    fig.supxlabel("Time-steps", size=18)
+    plt.legend()
+    plt.tight_layout()
+
+    return fig, axs

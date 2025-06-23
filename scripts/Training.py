@@ -128,8 +128,32 @@ np.savetxt(os.path.join(DATA_DIR, 'ts_mixer_pred.csv'), ts_mixer_preds_os, delim
 # ### 2.2 PatchTST
 
 # %%
+train_loader_patch = DataLoader(PatchTSTDataset(train_input.unsqueeze(-1), train_true),
+                                batch_size=32, shuffle=True)
+test_loader_patch = DataLoader(PatchTSTDataset(test_input.unsqueeze(-1), test_true),
+                               batch_size=32)
+
+# %%
 # TO-DO: train PatchTST model and export predictions
-...
+patch_TST = PatchTST(
+    num_variables=1,  # number of variables in the time series
+    seq_len=LOOKBACK,
+    patch_size=16, #must be a divisor of LOOKBACK
+    embed_dim=128,  # embedding dimension
+    num_layers=3,
+    num_heads=4,
+    output_steps=HORIZON,
+    dropout=0.1
+)
+
+patch_TST.fit(train_loader_patch, device='cpu', epochs=2, lr=1e-3)
+
+# %%
+patch_TST_preds, trues = patch_TST.predict(test_loader_patch, device='cpu')
+patch_TST_preds_os = scaler.inverse_transform(patch_TST_preds)
+
+# %%
+np.savetxt(os.path.join(DATA_DIR, 'patch_TST_pred.csv'), patch_TST_preds_os, delimiter=",")
 
 # %% [markdown]
 # ### 2.3 Distributional Neural Network (DNN)

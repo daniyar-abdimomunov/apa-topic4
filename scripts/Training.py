@@ -100,19 +100,29 @@ np.savetxt('../data/trues.csv', test_true_os,delimiter=",")
 # ### 2.1 TSMixer
 
 # %%
+train_loader = DataLoader(MTSMixerDataset(train_input.unsqueeze(-1), train_true), batch_size=32, shuffle=True)
+test_loader = DataLoader(MTSMixerDataset(test_input.unsqueeze(-1), test_true), batch_size=32)
+
+# %%
 # TO-DO: train TSMixer model and export predictions
-ts_mixer = ...
-ts_mixer.train(train_input, train_true)
+ts_mixer = MTSMixer(
+    num_variables= 1,
+    time_steps=LOOKBACK,
+    output_steps=HORIZON,
+    num_blocks=3,
+    hidden_dim=64,
+    activation='gelu'
+)
 
 # %%
-ts_mixer.evaluate(test_input, test_true)
+ts_mixer.fit(train_loader, device='cpu', epochs=2, lr=1e-3)
 
 # %%
-ts_mixer_preds = ts_mixer.pred(test_input)
-ts_mixer_preds # NOTE: make sure predictions are type np.ndarray and have shape (n, ), where n is the number of predicted time-steps
+ts_mixer_preds, trues = ts_mixer.predict(test_loader, device='cpu')
+ts_mixer_preds_os = scaler.inverse_transform(ts_mixer_preds)
 
 # %%
-np.savetxt(os.path.join(DATA_DIR, 'ts_mixer_pred.csv'), ts_mixer_preds, delimiter=",")
+np.savetxt(os.path.join(DATA_DIR, 'ts_mixer_pred.csv'), ts_mixer_preds_os, delimiter=",")
 
 # %% [markdown]
 # ### 2.2 PatchTST

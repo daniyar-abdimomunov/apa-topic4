@@ -22,14 +22,16 @@ def calculate_crps(y_true: np.array, y_pred: np.array) -> float:
 def calculate_rmse(y_true: np.array, y_pred: np.array) -> float:
     # code for calculation
     y_pred = _reduce_dimension(y_pred)
-    rmse_score = 0  ## code for calculation
+    rmse_score = np.sqrt(np.mean((y_true-y_pred)**2))
     return float(rmse_score)
 
 
 def calculate_mape(y_true: np.array, y_pred: np.array) -> float:
-    ## code for calculation
     y_pred = _reduce_dimension(y_pred)
-    mape_score = 0  ## code for calculation
+    nonzero_mask=y_true !=0 
+    if not np.any(nonzero_mask):
+        return float('inf')
+    mape_score=np.mean(np.abs((y_true[nonzero_mask]-y_pred[nonzero_mask])/y_true[nonzero_mask]))
     return float(mape_score)
 
 def _reduce_dimension(array: np.array) -> np.array:

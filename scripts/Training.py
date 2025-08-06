@@ -124,6 +124,16 @@ ts_mixer_preds_os = scaler.inverse_transform(ts_mixer_preds)
 # %%
 np.savetxt(os.path.join(DATA_DIR, 'ts_mixer_pred.csv'), ts_mixer_preds_os, delimiter=",")
 
+# %%
+# visualize predictions and confidence interval
+TEST_CASE = 0
+
+plot_predictions(
+    scaler.inverse_transform(test_input.numpy())[TEST_CASE],
+    scaler.inverse_transform(test_true.numpy())[TEST_CASE],
+    ts_mixer_preds_os[TEST_CASE],
+    title=f'TS Mixer Predictions\nTest Case: #{TEST_CASE}')
+
 # %% [markdown]
 # ### 2.2 PatchTST
 
@@ -155,6 +165,16 @@ patch_TST_preds_os = scaler.inverse_transform(patch_TST_preds)
 # %%
 np.savetxt(os.path.join(DATA_DIR, 'patch_TST_pred.csv'), patch_TST_preds_os, delimiter=",")
 
+# %%
+# visualize predictions and confidence interval
+TEST_CASE = 0
+
+plot_predictions(
+    scaler.inverse_transform(test_input.numpy())[TEST_CASE],
+    scaler.inverse_transform(test_true.numpy())[TEST_CASE],
+    patch_TST_preds_os[TEST_CASE],
+    title=f'Patch TST Predictions\nTest Case: #{TEST_CASE}')
+
 # %% [markdown]
 # ### 2.3 Distributional Neural Network (DNN)
 
@@ -185,7 +205,7 @@ np.savetxt(os.path.join(DATA_DIR, 'dnn_uppers.csv'), dnn_uppers, delimiter=",")
 ...
 
 # %% [markdown]
-# ## 2.5 Sundial Model
+# ### 2.5 Sundial Model
 # Sundial is a pre-trained model for Time-Series Forecasting.
 # This section is adapted from the [quickstart_zero_shot.ipynb](https://github.com/thuml/Sundial/blob/main/examples/quickstart_zero_shot.ipynb) provided by the developers of the Sundial Model.
 
@@ -233,4 +253,7 @@ plot_predictions(
     scaler.inverse_transform(test_true.numpy())[TEST_CASE],
     sundial_preds[TEST_CASE],
     sundial_lowers[TEST_CASE],
-    sundial_uppers[TEST_CASE])
+    sundial_uppers[TEST_CASE],
+    title=f'Sundial Model Predictions\nTest Case: #{TEST_CASE}')
+
+# %%

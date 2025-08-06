@@ -7,7 +7,10 @@
 
 import os
 import pickle
+from sklearn.preprocessing import StandardScaler
 import sys
+import torch
+from transformers import AutoModelForCausalLM
 
 PROJECT_ROOT = os.path.dirname(os.getcwd())
 sys.path.insert(0, PROJECT_ROOT)
@@ -20,7 +23,7 @@ from __init__ import *
 DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
 
 # %%
-#Import the data:
+# import the data:
 with open(os.path.join(DATA_DIR, 'EU_Electricity_TimeSeries.pkl'),'rb') as f:
     eu_df=pickle.load(f)
 
@@ -28,30 +31,64 @@ print(f'Dataset shape: {eu_df.shape}\n')
 eu_df
 
 # %%
-# Define variables for splitting train and test datasets
-# TO-DO: replace placeholder values for SEQ_LEN, NUM_SAMPLES, TEST_SAMPLES
-
-SEQ_LEN=96
-NUM_SAMPLES=600
-TEST_SAMPLES=200
-
-# %%
-# Split Train and Test datasets
-train_ts, test_ts = eu_df[:NUM_SAMPLES][['Germany (EUR/MWhe)']], eu_df[NUM_SAMPLES:NUM_SAMPLES + TEST_SAMPLES][['Germany (EUR/MWhe)']]
+# define train-test split and prediction parameters
+LOOKBACK=192
+HORIZON=96
+NUM_TRAIN_SAMPLES=3000 # Must be ≥ (LOOKBACK + HORIZON)
+NUM_TEST_SAMPLES=1000 # Must be ≥ (LOOKBACK + HORIZON)
 
 # %%
-# Scale data
-# TO-DO: scale train and test datasets
-...
+# split data into train and test datasets
+train  = eu_df[:NUM_TRAIN_SAMPLES]['Germany (EUR/MWhe)'].to_numpy()
+test = eu_df[NUM_TRAIN_SAMPLES:NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES]['Germany (EUR/MWhe)'].to_numpy()
+print(f'Train dataset shape: {train.shape}\n'
+      f'Test dataset shape: {test.shape}\n')
 
 # %%
-# Do time-series embedding for
-# TO-DO: implement time-series embedding
-...
-x_train = np.array()
-y_train = np.array()
-x_test = np.array()
-y_test = np.array()
+# Scale the data (i.e. electricity prices)
+scaler = StandardScaler()
+scaler.fit(train.reshape(-1, 1))
+train_scaled = scaler.transform(train.reshape(-1, 1)).reshape(-1)
+test_scaled = scaler.transform(test.reshape(-1, 1)).reshape(-1)
+
+print(f'Original Train dataset  mean: {round(train.mean(), 2)}; \tstd: {round(train.std(), 2)}\n'
+      f'Scaled Train dataset    mean: {round(train_scaled.mean(), 2)}; \t\tstd: {round(train_scaled.std(), 2)}\n'
+      f'Scaled Test dataset     mean: {round(test_scaled.mean(), 2)}; \tstd: {round(test_scaled.std(), 2)}\n')
+
+
+# %%
+def sequentialize(data: np.ndarray, lookback:int, horizon:int) -> (np.ndarray, np.ndarray):
+    input = list()
+    true = list()
+    for index, value in enumerate(data[:-(lookback+horizon)]):
+        input.append(data[index:index+lookback])
+        true.append(data[index+lookback:index+lookback+horizon])
+    return np.array(input), np.array(true)
+
+
+# %%
+# re-shape model into set of sequences,
+train_input, train_true = sequentialize(train_scaled, LOOKBACK, HORIZON)
+test_input, test_true = sequentialize(test_scaled, LOOKBACK, HORIZON)
+
+train_input = torch.Tensor(train_input)
+train_true = torch.Tensor(train_true)
+test_input = torch.Tensor(test_input)
+test_true = torch.Tensor(test_true)
+
+print('Shape of predictor inputs: ',train_input.shape)
+print('Shape of outputs: ',train_true.shape)
+print('Shape of test predictor inputs: ',test_input.shape)
+print('Shape of test outputs: ',test_true.shape)
+
+# %%
+test_input_os = scaler.inverse_transform(test_input.numpy())
+test_true_os = scaler.inverse_transform(test_true.numpy())
+
+# %%
+# save test data
+np.savetxt('../data/inputs.csv', test_input_os, delimiter=",")
+np.savetxt('../data/trues.csv', test_true_os,delimiter=",")
 
 # %% [markdown]
 # ## 2. Model Training
@@ -65,17 +102,17 @@ y_test = np.array()
 # %%
 # TO-DO: train TSMixer model and export predictions
 ts_mixer = ...
-ts_mixer.train(x_train, y_train)
+ts_mixer.train(train_input, train_true)
 
 # %%
-ts_mixer.evaluate(x_test, y_test)
+ts_mixer.evaluate(test_input, test_true)
 
 # %%
-y_pred_ts_mixer = ts_mixer.pred(x_test)
-y_pred_ts_mixer # NOTE: make sure predictions are type np.ndarray and have shape (n, ), where n is the number of predicted time-steps
+ts_mixer_preds = ts_mixer.pred(test_input)
+ts_mixer_preds # NOTE: make sure predictions are type np.ndarray and have shape (n, ), where n is the number of predicted time-steps
 
 # %%
-np.savetxt(os.path.join(DATA_DIR, 'ts_mixer_pred.csv'), y_pred_ts_mixer, delimiter=",")
+np.savetxt(os.path.join(DATA_DIR, 'ts_mixer_pred.csv'), ts_mixer_preds, delimiter=",")
 
 # %% [markdown]
 # ### 2.2 PatchTST
@@ -90,21 +127,21 @@ np.savetxt(os.path.join(DATA_DIR, 'ts_mixer_pred.csv'), y_pred_ts_mixer, delimit
 # %%
 # TO-DO: train DNN model and export predictions
 dnn = ...
-dnn.train(x_train, y_train)
+dnn.train(train_input, train_true)
 
 # %%
-dnn.evaluate(x_test, y_test)
+dnn.evaluate(test_input, test_true)
 
 # %%
-y_pred_dnn = dnn.pred(x_test)
-y_lower_dnn = ...
-y_upper_dnn = ...
-y_pred_dnn # NOTE: for probabilistic models we should get predictions in dimensions  (n, m), where n is the number of predicted time-steps, and m is the number of samples
+dnn_pred = dnn.pred(test_input)
+dnn_lowers = ...
+dnn_uppers = ...
+dnn_pred # NOTE: for probabilistic models we should get predictions in dimensions  (n, m), where n is the number of predicted time-steps, and m is the number of samples
 
 # %%
-np.savetxt(os.path.join(DATA_DIR, 'dnn_pred.csv'), y_pred_dnn, delimiter=",")
-np.savetxt(os.path.join(DATA_DIR, 'dnn_lower.csv'), y_lower_dnn, delimiter=",")
-np.savetxt(os.path.join(DATA_DIR, 'dnn_upper.csv'), y_upper_dnn, delimiter=",")
+np.savetxt(os.path.join(DATA_DIR, 'dnn_preds.csv'), dnn_pred, delimiter=",")
+np.savetxt(os.path.join(DATA_DIR, 'dnn_lowers.csv'), dnn_lowers, delimiter=",")
+np.savetxt(os.path.join(DATA_DIR, 'dnn_uppers.csv'), dnn_uppers, delimiter=",")
 
 # %% [markdown]
 # ### 2.4 LLMTime
@@ -112,3 +149,54 @@ np.savetxt(os.path.join(DATA_DIR, 'dnn_upper.csv'), y_upper_dnn, delimiter=",")
 # %%
 # TO-DO: train LLMTime model and export predictions
 ...
+
+# %% [markdown]
+# ## 2.5 Sundial Model
+# Sundial is a pre-trained model for Time-Series Forecasting.
+# This section is adapted from the [quickstart_zero_shot.ipynb](https://github.com/thuml/Sundial/blob/main/examples/quickstart_zero_shot.ipynb) provided by the developers of the Sundial Model.
+
+# %%
+# load model and dataset
+model = AutoModelForCausalLM.from_pretrained('thuml/sundial-base-128m', trust_remote_code=True)
+df = pd.read_csv("https://raw.githubusercontent.com/WenWeiTHU/TimeSeriesDatasets/refs/heads/main/ETT-small/ETTh2.csv")
+
+# %%
+# forecasting configurations
+NUM_SAMPLES = 20           # generate 20 samples
+forecast = model.generate(test_input, max_new_tokens=HORIZON, num_samples=NUM_SAMPLES) # generate 20 probable predictions
+print(f'Predictions shape: {forecast.shape}\n'
+      f'{forecast.shape[0]} - test cases\n'
+      f'{forecast.shape[1]} - prediction samples\n'
+      f'{forecast.shape[2]} - predicted time-steps (i.e. prediction horizon)\n')
+
+# %%
+# separate predictions and confidence interval
+sundial_preds = scaler.inverse_transform(forecast.mean(dim=1))
+sundial_lowers = scaler.inverse_transform(forecast.quantile(q=0.05, dim=1))
+sundial_uppers = scaler.inverse_transform(forecast.quantile(q=0.95, dim=1))
+
+# %%
+# export forecast outputs for benchmarking
+np.savetxt('../data/sundial_preds.csv',sundial_preds,delimiter=",")
+np.savetxt('../data/sundial_lowers.csv',sundial_lowers,delimiter=",")
+np.savetxt('../data/sundial_uppers.csv',sundial_uppers,delimiter=",")
+
+# %%
+# visualize raw predictions
+TEST_CASE = 666
+
+plt.figure(figsize=(15, 5))
+plt.xlim(0, LOOKBACK + HORIZON)
+plt.plot(np.arange(LOOKBACK), test_input[TEST_CASE], color='black')
+plt.plot(np.arange(LOOKBACK, LOOKBACK + HORIZON), forecast[TEST_CASE].transpose(1, 0))
+plt.grid()
+plt.show()
+
+# %%
+# visualize predictions and confidence interval
+plot_predictions(
+    scaler.inverse_transform(test_input.numpy())[TEST_CASE],
+    scaler.inverse_transform(test_true.numpy())[TEST_CASE],
+    sundial_preds[TEST_CASE],
+    sundial_lowers[TEST_CASE],
+    sundial_uppers[TEST_CASE])

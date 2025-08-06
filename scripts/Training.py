@@ -32,10 +32,10 @@ eu_df
 
 # %%
 # define train-test split and prediction parameters
-LOOKBACK=192
-HORIZON=96
-NUM_TRAIN_SAMPLES=3000 # Must be ≥ (LOOKBACK + HORIZON)
-NUM_TEST_SAMPLES=1000 # Must be ≥ (LOOKBACK + HORIZON)
+LOOKBACK = 192
+HORIZON = 96
+NUM_TRAIN_SAMPLES = 3000 + LOOKBACK + HORIZON - 1
+NUM_TEST_SAMPLES = 1000 + LOOKBACK + HORIZON - 1
 
 # %%
 # split data into train and test datasets
@@ -54,17 +54,6 @@ test_scaled = scaler.transform(test.reshape(-1, 1)).reshape(-1)
 print(f'Original Train dataset  mean: {round(train.mean(), 2)}; \tstd: {round(train.std(), 2)}\n'
       f'Scaled Train dataset    mean: {round(train_scaled.mean(), 2)}; \t\tstd: {round(train_scaled.std(), 2)}\n'
       f'Scaled Test dataset     mean: {round(test_scaled.mean(), 2)}; \tstd: {round(test_scaled.std(), 2)}\n')
-
-
-# %%
-def sequentialize(data: np.ndarray, lookback:int, horizon:int) -> (np.ndarray, np.ndarray):
-    input = list()
-    true = list()
-    for index, value in enumerate(data[:-(lookback+horizon)]):
-        input.append(data[index:index+lookback])
-        true.append(data[index+lookback:index+lookback+horizon])
-    return np.array(input), np.array(true)
-
 
 # %%
 # re-shape model into set of sequences,
@@ -148,7 +137,7 @@ test_loader_patch = DataLoader(PatchTSTDataset(test_input.unsqueeze(-1), test_tr
 patch_TST = PatchTST(
     num_variables=1,  # number of variables in the time series
     seq_len=LOOKBACK,
-    patch_size=16, #must be a divisor of LOOKBACK
+    patch_size=16, # must be a divisor of LOOKBACK
     embed_dim=128,  # embedding dimension
     num_layers=3,
     num_heads=4,
@@ -255,5 +244,3 @@ plot_predictions(
     sundial_lowers[TEST_CASE],
     sundial_uppers[TEST_CASE],
     title=f'Sundial Model Predictions\nTest Case: #{TEST_CASE}')
-
-# %%

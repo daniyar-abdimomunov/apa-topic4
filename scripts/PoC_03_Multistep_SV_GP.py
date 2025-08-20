@@ -1,7 +1,9 @@
+# %% [markdown]
+# # Proof-of-Concept 03: Multivariate Multistep Variational GP and Neural Extension
+
 # %%
 # %load_ext autoreload
 # %autoreload 2
-
 
 import os
 import pickle

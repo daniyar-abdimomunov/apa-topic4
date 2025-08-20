@@ -3,3 +3,5 @@ from utils.preprocessing import *
 from utils.visualizations import *
 from utils.PatchTST import *
 from utils.TSMixer import *
+from utils.MultistepSVGP import *
+from utils.NeuralTSGP import *

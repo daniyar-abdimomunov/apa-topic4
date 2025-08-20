@@ -1,6 +1,6 @@
 from torch.nn import Sequential, Linear, ReLU
 from gpytorch.utils.grid import ScaleToBounds
-from utils.MultistepSVGP import TSGPModel
+from utils.models.MultistepSVGP import TSGPModel
 
 class LargeFeatureExtractor(Sequential):
     def __init__(self, input_dim, latent_dimension):

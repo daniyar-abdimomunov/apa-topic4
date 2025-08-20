@@ -1,12 +1,16 @@
+# %% [markdown]
+# # Proof-of-Concept 02: Multistep (i.e. Batch Independent Multioutput) GP
+
 # %%
-import torch
 import gpytorch
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
+import numpy as np
 import pickle
 from sklearn.preprocessing import StandardScaler
-from torch import Tensor
-import numpy as np
-# %matplotlib inline
+import torch
+
+# %% [markdown]
+# ## 1. Data Import and Processing
 
 # %%
 # import the data:
@@ -57,16 +61,19 @@ def sequentialize(data: np.ndarray, lookback:int, horizon:int) -> (np.ndarray, n
 train_input, train_true = sequentialize(train_scaled, LOOKBACK, HORIZON)
 test_input, test_true = sequentialize(test_scaled, LOOKBACK, HORIZON)
 
-train_input = Tensor(train_input)
-train_true = Tensor(train_true)
-test_input = Tensor(test_input)
-test_true = Tensor(test_true)
+train_input = torch.Tensor(train_input)
+train_true = torch.Tensor(train_true)
+test_input = torch.Tensor(test_input)
+test_true = torch.Tensor(test_true)
 
 print('Shape of predictor inputs: ',train_input.shape)
 print('Shape of outputs: ',train_true.shape)
 print('Shape of test predictor inputs: ',test_input.shape)
 print('Shape of test outputs: ',test_true.shape)
 
+
+# %% [markdown]
+# ## 2. Train Multistep (ie Batch Independent Multioutput) GP
 
 # %%
 class BatchIndependentMultitaskGPModel(gpytorch.models.ExactGP):
@@ -82,6 +89,7 @@ class BatchIndependentMultitaskGPModel(gpytorch.models.ExactGP):
     def forward(self, x):
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
+
         return gpytorch.distributions.MultitaskMultivariateNormal.from_batch_mvn(
             gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
         )
@@ -112,7 +120,7 @@ model = BatchIndependentMultitaskGPModel(train_input, train_true, likelihood)
 
 # %%
 # train model
-NUM_ITERATIONS = 40
+NUM_ITERATIONS = 70
 
 # Find optimal model hyperparameters
 model.train()
@@ -156,7 +164,7 @@ likelihood.eval()
 
 # Make predictions
 with torch.no_grad(), gpytorch.settings.fast_pred_var():
-    predictions = likelihood(model(test_input))
+    predictions = likelihood(model(test_input[:]))
     preds = predictions.mean
     lowers, uppers = predictions.confidence_region()
 
@@ -172,41 +180,46 @@ def plot_predictions(
         input:np.ndarray,
         true:np.ndarray,
         pred:np.ndarray,
-        lower:np.ndarray=None,
-        upper:np.ndarray=None):
+        lower:np.ndarray=np.array([]),
+        upper:np.ndarray=np.array([]),
+        title:str=None,):
     x_input = list(range(-input.shape[0], 0))
     x_true = list(range(true.shape[0]))
 
     # Initialize plot
-    f, ax = plt.subplots(1, 1, figsize=(14, 5))
+    f, ax = plt.subplots(1, 1, figsize=(14, 5), layout='tight')
 
     # Plot training data as black stars
-    ax.plot(x_input, input, 'g')
+    ax.plot(x_input, input, 'g', label='Input Data')
     # Plot predictive means as blue line
-    ax.plot(x_true, true, 'r.', alpha=0.5)
+    ax.plot(x_true, true, 'r.', alpha=0.5, label='Observed Data')
     # Plot predictive means as blue line
-    ax.plot(x_true, pred, 'b')
+    ax.plot(x_true, pred, 'b', label='Prediction')
     # Shade between the lower and upper confidence bounds
-    ax.fill_between(x=x_true, y1=lower, y2=upper, alpha=0.5)
+    if len(lower) and len(upper):
+        ax.fill_between(x=x_true, y1=lower, y2=upper, alpha=0.5, label='Confidence Interval')
     ax.set_xlabel('Time Steps')
     ax.set_ylabel('Price (EUR/MWhe)')
     #ax.set_xlim(-10, 20)
-    ax.set_ylim([-20, 210])
-    ax.legend(['Input Data', 'Observed Data', 'Prediction', 'Confidence Interval'])
+    ax.set_ylim((-20, 210))
+    ax.grid()
+    plt.suptitle(title)
+    plt.legend()
     plt.show()
     return
 
 
 # %%
 # plot predictions
-TEST_CASE = 711
+TEST_CASE = 0
 
 plot_predictions(
     input=scaler.inverse_transform(test_input.numpy())[TEST_CASE],
     true=scaler.inverse_transform(test_true.numpy())[TEST_CASE],
     pred=preds_os[TEST_CASE],
     lower=lowers_os[TEST_CASE],
-    upper=uppers_os[TEST_CASE]
+    upper=uppers_os[TEST_CASE],
+    title=f'Time-series GP Model Predictions\nTest Case: #{TEST_CASE}'
 )
 
 # %%

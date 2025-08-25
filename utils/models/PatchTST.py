@@ -64,9 +64,11 @@ class TransformerEncoderLayer(nn.Module):
 
 class PatchTST(nn.Module):
     def __init__(self, num_variables, seq_len, patch_size=16, embed_dim=128,
-                 num_layers=3, num_heads=4, output_steps=24, dropout=0.1):
+                 num_layers=3, num_heads=4, output_steps=24, dropout=0.1, return_embeddings=False):
         super().__init__()
         assert seq_len % patch_size == 0, "seq_len must be divisible by patch_size"
+        self.return_embeddings = return_embeddings
+
         self.patch_embed = PatchEmbedding(num_variables, patch_size, embed_dim, seq_len)
         self.pos_embed = nn.Parameter(torch.zeros(1, seq_len // patch_size, embed_dim))
         self.dropout = nn.Dropout(dropout)
@@ -75,6 +77,7 @@ class PatchTST(nn.Module):
             for _ in range(num_layers)
         ])
         self.norm = nn.LayerNorm(embed_dim)
+
         self.head = nn.Linear(embed_dim * (seq_len // patch_size), output_steps)
 
     def forward(self, x):
@@ -86,8 +89,11 @@ class PatchTST(nn.Module):
             x = layer(x)
         x = self.norm(x)
         x = torch.flatten(x, start_dim=1)
-        out = self.head(x)
-        return out
+
+        if self.return_embeddings:
+            return x
+        else:
+         return self.head(x)
 
     # -----------------------------
     # Training and Evaluation

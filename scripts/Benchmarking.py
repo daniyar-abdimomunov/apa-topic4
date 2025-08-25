@@ -1,6 +1,12 @@
 # %% [markdown]
 # # Benchmarking
+"""
+Benchmarking pipeline _overview 
 
+Evaluate multiple forecasting models on a shared dataset by computing RMSE
+MAPE , PICP and CRPS , then visualize results for aggregate and case level
+insights .
+"""
 # %%
 # %load_ext autoreload
 # %autoreload 2
@@ -13,6 +19,7 @@ import sys
 PROJECT_ROOT = os.path.dirname(os.getcwd())
 sys.path.insert(0, PROJECT_ROOT)
 from __init__ import *
+
 
 # %% [markdown]
 # ## 1. Import Input and Prediction Data
@@ -55,6 +62,17 @@ print(f'shape of true: {trues.shape}\n'
       f'shape of uppers: {gp_uppers.shape}')
 
 # %%
+# benchmarking structure:
+# {
+#   'model_id': {
+#       'name': str,                   # display label
+#       'pred': Sequence[float],       # point predictions
+#       'lower': Sequence[float] | None, # lower prediction interval (None if unavailable)
+#       'upper': Sequence[float] | None, # upper prediction interval (None if unavailable)
+#       'metrics': dict[str, float],   # evaluation metrics (e.g. RMSE, MAPE)
+#   },
+#   ...
+# }
 benchmarking = {
       'ts_mixer': {
             'name': 'TS Mixer',
@@ -90,45 +108,56 @@ benchmarking = {
 # ## 2. Calculate Benchmark Metrics
 
 # %%
+# Compute RMSE for each model
 for model in benchmarking.keys():
       benchmarking[model]['metrics']['rmse'] = calculate_rmse(trues, benchmarking[model]['pred'])
       print(f"{benchmarking[model]['name']} RMSE: {benchmarking[model]['metrics']['rmse']}")
 
 # %%
+# Compute MAPE for each model 
 for model in benchmarking.keys():
       benchmarking[model]['metrics']['mape'] = calculate_mape(trues, benchmarking[model]['pred'])
       print(f"{benchmarking[model]['name']} MAPE: {benchmarking[model]['metrics']['mape']}")
 
 # %%
+# Compute PICP 
+#only valid for models providing lower and upper prediction bounds
 for model in benchmarking.keys():
       benchmarking[model]['metrics']['picp'] = calculate_picp(trues, benchmarking[model]['lower'], benchmarking[model]['upper'])
       print(f"{benchmarking[model]['name']} PICP: {benchmarking[model]['metrics']['picp']}")
 
 # %%
+#Compute CRPS using the true values and model predictions and display results
 for model in benchmarking.keys():
       benchmarking[model]['metrics']['crps'] = calculate_crps(trues, benchmarking[model]['pred'])
       print(f"{benchmarking[model]['name']} CRPS: {benchmarking[model]['metrics']['crps']}")
 
 # %%
+#Collect all evaluation metrics from the benchmarking dict
+#into a new dictionary (benchmarking_scores) , then convert it
+#into a pandas dataframe for tabular display
 benchmarking_scores = dict()
 for model_name, results in benchmarking.items():
       benchmarking_scores[model_name] = dict()
       benchmarking_scores[model_name] = results['metrics']
+#create a data frame with model names as rows and metrics as columns
 pd.DataFrame.from_dict(benchmarking_scores, orient='index')
 
 # %% [markdown]
 # ## 3. Benchmark Scores and Predictions Evaluation
 
 # %%
+#Compare overall models and display the results
 figures = compare_scores(benchmarking)
 plt.show()
 
 # %%
+#visualize predictions of all models for a single test case
 fig, ax = compare_single_prediction(inputs, trues, benchmarking, test_case = 488)
 plt.show()
 
 # %%
+#Visualize predictions of all models for multiple selected test cases 
 test_cases = [0, 178, 367, 711]
-
 fig, axs = compare_multi_predictions(inputs, trues, benchmarking, test_cases = test_cases)
 plt.show()

@@ -47,24 +47,9 @@ class PatchTSTFeatureExtractor(Module):
 
 
 class NeuralTSGPModel(TSGPModel):
-    def __init__(self, inducing_points, horizon, num_latents_svgp, num_latents_lfe, grid_bounds=(-1., 1.), feature_extractor_type='large',
-                 num_variables=None, time_steps=None):
-
+    def __init__(self, inducing_points, horizon, num_latents_svgp, num_latents_lfe, grid_bounds=(-1., 1.)):
         num_input_vars = inducing_points.size(-1)
-
-        match feature_extractor_type:
-            case 'tsmixer':
-                if time_steps is None or num_variables is None:
-                    raise ValueError("num_variables and time_steps must be provided for TSMixer feature extractor.")
-                latent_feature_extractor = TSMixerFeatureExtractor(num_variables, time_steps, latent_dimension=num_latents_lfe)
-            case 'large':
-                latent_feature_extractor = LargeFeatureExtractor(num_input_vars, latent_dimension=num_latents_lfe)
-            case 'patch_tst':
-                latent_feature_extractor = PatchTST(num_variables, time_steps, output_steps=num_latents_lfe, return_embeddings=True)
-            case _:
-                raise ValueError(f"Unknown feature_extractor_type: {feature_extractor_type}. Choose 'large' or 'tsmixer'.")
-
-
+        latent_feature_extractor = LargeFeatureExtractor(num_input_vars, latent_dimension=num_latents_lfe)
         scale_to_bounds = ScaleToBounds(grid_bounds[0], grid_bounds[1])
 
         inducing_points = latent_feature_extractor(inducing_points)
@@ -80,3 +65,28 @@ class NeuralTSGPModel(TSGPModel):
         projected_x = self.scale_to_bounds(projected_x)
 
         return super().forward(projected_x)
+
+class PatchTSTGPModel(TSGPModel):
+    def __init__(self, inducing_points, horizon, num_latents_svgp, latent_dimension=50, patch_size=16, embed_dim=128,
+                 num_layers=3, num_heads=4, dropout=0.1):
+
+        num_input_vars = int(inducing_points.size(-1))
+        patch_tst_layer = PatchTSTFeatureExtractor(
+            num_variables=num_input_vars,
+            time_steps=horizon,
+            latent_dimension=latent_dimension,
+            patch_size=patch_size,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            dropout=dropout
+        )
+        inducing_points = patch_tst_layer(inducing_points)
+        super().__init__(inducing_points, horizon, num_latents_svgp)
+
+        self.patch_tst_layer = patch_tst_layer
+
+    def forward(self, x):
+        patched_x = self.patch_tst_layer(x)
+
+        return super().forward(patched_x)

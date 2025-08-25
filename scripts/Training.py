@@ -145,6 +145,7 @@ patch_TST = PatchTST(
     dropout=0.1
 )
 
+# %%
 patch_TST.fit(train_loader_patch, device='cpu', epochs=15, lr=1e-3)
 
 # %%
@@ -304,12 +305,15 @@ plot_predictions(
 )
 
 # %% [markdown]
-# ## 2.6.2 Neural SVGP
+# ### 2.6.2 Neural SVGP
 
 # %%
 # training
-neural_tsgp = NeuralTSGPModel(inducing_points, HORIZON, num_latents_svgp=10, num_latents_lfe=16)
-neural_tsgp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=10)
+NUM_LATENTS_LFE = 16
+neural_tsgp = NeuralTSGPModel(inducing_points, HORIZON, num_latents_svgp=NUM_LATENTS_SVGP, num_latents_lfe=NUM_LATENTS_LFE)
+
+# %%
+neural_tsgp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=25)
 
 # %%
 # Inference with Neural TSGP
@@ -336,6 +340,47 @@ plot_predictions(
     neural_tsgp_preds[TEST_CASE],
     neural_tsgp_lowers[TEST_CASE],
     neural_tsgp_uppers[TEST_CASE],
+    title=f'Neural TSGP Model Predictions\nTest Case: #{TEST_CASE}'
+)
+
+# %%
+
+# %% [markdown]
+# ### 2.6.3 PatchTST Extension for Time-series GP Model
+
+# %%
+# training
+patch_tst_gp = PatchTSTGPModel(inducing_points, HORIZON, LOOKBACK, num_latents_svgp=NUM_LATENTS_SVGP, num_layers=6, embed_dim=8)
+
+
+# %%
+patch_tst_gp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=10)
+
+# %%
+# Inference with PatchTST GP
+patch_tst_gp_preds, patch_tst_gp_lowers, patch_tst_gp_uppers = patch_tst_gp.infer(test_input)
+
+# %%
+# separate predictions and confidence interval
+patch_tst_gp_preds = scaler.inverse_transform(patch_tst_gp_preds.detach().numpy())
+patch_tst_gp_lowers = scaler.inverse_transform(patch_tst_gp_lowers.detach().numpy())
+patch_tst_gp_uppers = scaler.inverse_transform(patch_tst_gp_uppers.detach().numpy())
+
+# %%
+# export
+np.save(os.path.join(DATA_DIR, 'patch_tst_gp_preds.npy'), patch_tst_gp_preds)
+np.save(os.path.join(DATA_DIR, 'patch_tst_gp_lowers.npy'), patch_tst_gp_lowers)
+np.save(os.path.join(DATA_DIR, 'patch_tst_gp_uppers.npy'), patch_tst_gp_uppers)
+
+# %%
+# visualization
+TEST_CASE = 666
+plot_predictions(
+    test_input_os[TEST_CASE],
+    test_true_os[TEST_CASE],
+    patch_tst_gp_preds[TEST_CASE],
+    patch_tst_gp_lowers[TEST_CASE],
+    patch_tst_gp_uppers[TEST_CASE],
     title=f'Neural TSGP Model Predictions\nTest Case: #{TEST_CASE}'
 )
 

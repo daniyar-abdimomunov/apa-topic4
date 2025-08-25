@@ -224,6 +224,6 @@ plot_predictions(
 
 # %%
 # save predictions
-np.savetxt('../data/mt_batch_ts_gp_preds.csv', preds_os, delimiter=",")
-np.savetxt('../data/mt_batch_ts_gp_lowers.csv',lowers_os,delimiter=",")
-np.savetxt('../data/mt_batch_ts_gp_uppers.csv',uppers_os,delimiter=",")
+np.save('../data/mt_batch_ts_gp_preds.npy', preds_os)
+np.save('../data/mt_batch_ts_gp_lowers.npy',lowers_os)
+np.save('../data/mt_batch_ts_gp_uppers.npy',uppers_os)

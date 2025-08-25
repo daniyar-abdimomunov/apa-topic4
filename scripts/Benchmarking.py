@@ -1,12 +1,9 @@
 # %% [markdown]
 # # Benchmarking
-"""
-Benchmarking pipeline _overview 
-
-Evaluate multiple forecasting models on a shared dataset by computing RMSE
-MAPE , PICP and CRPS , then visualize results for aggregate and case level
-insights .
-"""
+#
+# Evaluate multiple forecasting models on a shared dataset by computing RMSE
+# MAPE, PICP and CRPS, then visualize results for aggregate and case level
+# insights.
 # %%
 # %load_ext autoreload
 # %autoreload 2
@@ -28,38 +25,38 @@ from __init__ import *
 DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
 
 # %%
-inputs = np.genfromtxt(os.path.join(DATA_DIR, 'inputs.csv'), delimiter=',')
-trues = np.genfromtxt(os.path.join(DATA_DIR, 'trues.csv') , delimiter=',')
+inputs = np.load(os.path.join(DATA_DIR, 'inputs.npy'))
+trues = np.load(os.path.join(DATA_DIR, 'trues.npy'))
 print(f'shape of inputs: {inputs.shape}\n'
       f'shape of trues: {trues.shape}\n')
 
 # %%
-ts_mixer_preds = np.genfromtxt(os.path.join(DATA_DIR, 'ts_mixer_pred.csv') , delimiter=',')
+ts_mixer_preds = np.load(os.path.join(DATA_DIR, 'ts_mixer_pred.npy'))
 print(f'shape of trues: {trues.shape}\n'
       f'shape of preds: {ts_mixer_preds.shape}\n')
 
 # %%
-patch_tst_preds = np.genfromtxt(os.path.join(DATA_DIR, 'patch_TST_pred.csv') , delimiter=',')
+patch_tst_preds = np.load(os.path.join(DATA_DIR, 'patch_TST_pred.npy'))
 print(f'shape of trues: {trues.shape}\n'
       f'shape of preds: {ts_mixer_preds.shape}\n')
 
 # %%
-sundial_preds = np.genfromtxt(os.path.join(DATA_DIR, 'sundial_preds.csv') , delimiter=',')
-sundial_lowers = np.genfromtxt(os.path.join(DATA_DIR, 'sundial_lowers.csv') , delimiter=',')
-sundial_uppers = np.genfromtxt(os.path.join(DATA_DIR, 'sundial_uppers.csv') , delimiter=',')
+sundial_preds = np.load(os.path.join(DATA_DIR, 'sundial_preds.npy'))
+sundial_lowers = np.load(os.path.join(DATA_DIR, 'sundial_lowers.npy'))
+sundial_uppers = np.load(os.path.join(DATA_DIR, 'sundial_uppers.npy'))
 print(f'shape of trues: {trues.shape}\n'
       f'shape of preds: {sundial_preds.shape}\n'
       f'shape of lowers: {sundial_lowers.shape}\n'
       f'shape of uppers: {sundial_uppers.shape}')
 
 # %%
-gp_preds = np.genfromtxt(os.path.join(DATA_DIR, 'mt_batch_ts_gp_preds.csv') , delimiter=',')
-gp_lowers = np.genfromtxt(os.path.join(DATA_DIR, 'mt_batch_ts_gp_lowers.csv') , delimiter=',')
-gp_uppers = np.genfromtxt(os.path.join(DATA_DIR, 'mt_batch_ts_gp_uppers.csv') , delimiter=',')
-print(f'shape of true: {trues.shape}\n'
-      f'shape of preds: {gp_preds.shape}\n'
-      f'shape of lowers: {gp_lowers.shape}\n'
-      f'shape of uppers: {gp_uppers.shape}')
+#gp_preds = np.load(os.path.join(DATA_DIR, 'mt_batch_ts_gp_preds.npy'))
+#gp_lowers = np.load(os.path.join(DATA_DIR, 'mt_batch_ts_gp_lowers.npy'))
+#gp_uppers = np.load(os.path.join(DATA_DIR, 'mt_batch_ts_gp_uppers.npy'))
+#print(f'shape of true: {trues.shape}\n'
+#      f'shape of preds: {gp_preds.shape}\n'
+#      f'shape of lowers: {gp_lowers.shape}\n'
+#      f'shape of uppers: {gp_uppers.shape}')
 
 # %%
 # benchmarking structure:
@@ -77,15 +74,11 @@ benchmarking = {
       'ts_mixer': {
             'name': 'TS Mixer',
             'pred': ts_mixer_preds,
-            'lower': None,
-            'upper': None,
             'metrics': dict()
       },
       'patch_tst': {
             'name': 'Patch TST',
             'pred': patch_tst_preds,
-            'lower': None,
-            'upper': None,
             'metrics': dict()
       },
       'sundial': {
@@ -95,13 +88,13 @@ benchmarking = {
             'upper': sundial_uppers,
             'metrics': dict(),
       },
-      'timeseries_gp': {
-            'name': 'Time-series GP',
-            'pred': gp_preds,
-            'lower': gp_lowers,
-            'upper': gp_uppers,
-            'metrics': dict(),
-      },
+      #'timeseries_gp': {
+      #      'name': 'Time-series GP',
+      #      'pred': gp_preds,
+      #      'lower': gp_lowers,
+      #      'upper': gp_uppers,
+      #      'metrics': dict(),
+      #},
 }
 
 # %% [markdown]
@@ -123,7 +116,11 @@ for model in benchmarking.keys():
 # Compute PICP 
 #only valid for models providing lower and upper prediction bounds
 for model in benchmarking.keys():
-      benchmarking[model]['metrics']['picp'] = calculate_picp(trues, benchmarking[model]['lower'], benchmarking[model]['upper'])
+      if 'lower' in benchmarking[model].keys() and 'upper' in benchmarking[model].keys():
+            picp = calculate_picp(trues, benchmarking[model]['lower'], benchmarking[model]['upper'])
+      else:
+            picp = None
+      benchmarking[model]['metrics']['picp'] = picp
       print(f"{benchmarking[model]['name']} PICP: {benchmarking[model]['metrics']['picp']}")
 
 # %%

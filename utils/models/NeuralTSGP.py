@@ -4,6 +4,8 @@ from utils.models.MultistepSVGP import TSGPModel
 from utils.models.TSMixer import MTSMixerBlock
 from utils.models.PatchTST import PatchTST
 
+import torch
+
 class LargeFeatureExtractor(Sequential):
     def __init__(self, input_dim, latent_dimension):
         super(LargeFeatureExtractor, self).__init__()
@@ -66,14 +68,59 @@ class NeuralTSGPModel(TSGPModel):
 
         return super().forward(projected_x)
 
+<<<<<<< HEAD
 class PatchTSTGPModel(TSGPModel):
     def __init__(self, inducing_points, horizon, num_latents_svgp, latent_dimension=50, patch_size=16, embed_dim=128,
+=======
+    def train_model(self, *args, **kwargs):
+        self.latent_feature_extractor.train()
+        super().train_model(add_optimizer_params = [{'params': self.latent_feature_extractor.parameters()}], *args, **kwargs)
+
+    def infer(self, *args, **kwargs):
+        self.latent_feature_extractor.eval()
+        return super().infer(*args, **kwargs)
+
+
+class TSMixerGPModel(TSGPModel):
+    def __init__(self, inducing_points, horizon, num_latents_svgp, num_latents_lfe,
+                 grid_bounds=(-1., 1.), num_variables=1, time_steps=192):
+
+        # initialize GP with dummy inducing points in latent space
+        super().__init__(
+            inducing_points=torch.randn(inducing_points.shape[0], num_latents_lfe),
+            horizon=horizon,
+            num_latents_svgp=num_latents_svgp
+        )
+
+
+        # trainable feature extractor
+        self.ts_mixer_layer = TSMixerFeatureExtractor(
+            num_variables=num_variables,
+            time_steps=time_steps,
+            latent_dimension=num_latents_lfe
+        )
+
+        self.scale_to_bounds = ScaleToBounds(*grid_bounds)
+
+    def forward(self, x):
+        # project inputs dynamically
+        mixed_x = self.ts_mixer_layer(x)
+        mixed_x = self.scale_to_bounds(mixed_x)
+        return super().forward(mixed_x)
+
+class PatchTSTGPModel(TSGPModel):
+    def __init__(self, inducing_points, horizon, lookback, num_latents_svgp, grid_bounds=(-1., 1.), latent_dimension=50, patch_size=16, embed_dim=128,
+>>>>>>> 5512aab581ce4889aef56b0a00b21f8349621622
                  num_layers=3, num_heads=4, dropout=0.1):
 
         num_input_vars = int(inducing_points.size(-1))
         patch_tst_layer = PatchTSTFeatureExtractor(
             num_variables=num_input_vars,
+<<<<<<< HEAD
             time_steps=horizon,
+=======
+            time_steps=lookback,
+>>>>>>> 5512aab581ce4889aef56b0a00b21f8349621622
             latent_dimension=latent_dimension,
             patch_size=patch_size,
             embed_dim=embed_dim,
@@ -81,6 +128,7 @@ class PatchTSTGPModel(TSGPModel):
             num_heads=num_heads,
             dropout=dropout
         )
+<<<<<<< HEAD
         inducing_points = patch_tst_layer(inducing_points)
         super().__init__(inducing_points, horizon, num_latents_svgp)
 
@@ -90,3 +138,27 @@ class PatchTSTGPModel(TSGPModel):
         patched_x = self.patch_tst_layer(x)
 
         return super().forward(patched_x)
+=======
+        scale_to_bounds = ScaleToBounds(grid_bounds[0], grid_bounds[1])
+
+        inducing_points = patch_tst_layer(inducing_points)
+        inducing_points = scale_to_bounds(inducing_points)
+        super().__init__(inducing_points, horizon, num_latents_svgp)
+
+        self.patch_tst_layer = patch_tst_layer
+        self.scale_to_bounds = scale_to_bounds
+
+    def forward(self, x):
+        patched_x = self.patch_tst_layer(x)
+        patched_x = self.scale_to_bounds(patched_x)
+
+        return super().forward(patched_x)
+
+    def train_model(self, *args, **kwargs):
+        self.patch_tst_layer.train()
+        super().train_model(add_optimizer_params = [{'params': self.patch_tst_layer.parameters()}], *args,  **kwargs)
+
+    def infer(self, *args, **kwargs):
+        self.patch_tst_layer.eval()
+        return super().infer(*args, **kwargs)
+>>>>>>> 5512aab581ce4889aef56b0a00b21f8349621622

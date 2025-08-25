@@ -65,7 +65,8 @@ class TSGPModel(Module):
             self,
             train_loader: DataLoader,
             num_data: int,
-            epochs: int = 25):
+            epochs: int = 25,
+            add_optimizer_params: list = []):
         self.gp_layer.train()
         self.likelihood.train()
 
@@ -75,10 +76,11 @@ class TSGPModel(Module):
             num_data=num_data  # num_samples (N)
         )
         # Optimizer
-        optimizer = Adam([
+        params = [
             {'params': self.gp_layer.parameters()},
             {'params': self.likelihood.parameters()},
-        ], lr=0.01)
+        ] + add_optimizer_params
+        optimizer = Adam(params, lr=0.01)
 
         for epoch in range(epochs):
             running_loss = 0.0

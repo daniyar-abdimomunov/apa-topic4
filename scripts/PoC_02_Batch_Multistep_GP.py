@@ -2,17 +2,12 @@
 # # Proof-of-Concept 02: Multistep (i.e. Batch Independent Multioutput) GP
 
 # %%
-# %load_ext autoreload
-# %autoreload 2
-# %matplotlib inline
-
 import gpytorch
+import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 from sklearn.preprocessing import StandardScaler
 import torch
-
-from __init__ import plot_predictions, sequentialize
 
 # %% [markdown]
 # ## 1. Data Import and Processing
@@ -49,6 +44,17 @@ test_scaled = scaler.transform(test.reshape(-1, 1)).reshape(-1)
 print(f'Original Train dataset  mean: {round(train.mean(), 2)}; \tstd: {round(train.std(), 2)}\n'
       f'Scaled Train dataset    mean: {round(train_scaled.mean(), 2)}; \t\tstd: {round(train_scaled.std(), 2)}\n'
       f'Scaled Test dataset     mean: {round(test_scaled.mean(), 2)}; \tstd: {round(test_scaled.std(), 2)}\n')
+
+
+# %%
+def sequentialize(data: np.ndarray, lookback:int, horizon:int) -> (np.ndarray, np.ndarray):
+    input = list()
+    true = list()
+    for index, value in enumerate(data[:-(lookback+horizon)]):
+        input.append(data[index:index+lookback])
+        true.append(data[index+lookback:index+lookback+horizon])
+    return np.array(input), np.array(true)
+
 
 # %%
 # re-shape model into set of sequences,
@@ -114,7 +120,7 @@ model = BatchIndependentMultitaskGPModel(train_input, train_true, likelihood)
 
 # %%
 # train model
-NUM_ITERATIONS = 70
+NUM_ITERATIONS = 40
 
 # Find optimal model hyperparameters
 model.train()
@@ -168,9 +174,44 @@ preds_os = scaler.inverse_transform(preds.numpy())
 lowers_os = scaler.inverse_transform(lowers.numpy())
 uppers_os = scaler.inverse_transform(uppers.numpy())
 
+
+# %%
+def plot_predictions(
+        input:np.ndarray,
+        true:np.ndarray,
+        pred:np.ndarray,
+        lower:np.ndarray=np.array([]),
+        upper:np.ndarray=np.array([]),
+        title:str=None,):
+    x_input = list(range(-input.shape[0], 0))
+    x_true = list(range(true.shape[0]))
+
+    # Initialize plot
+    f, ax = plt.subplots(1, 1, figsize=(14, 5), layout='tight')
+
+    # Plot training data as black stars
+    ax.plot(x_input, input, 'g', label='Input Data')
+    # Plot predictive means as blue line
+    ax.plot(x_true, true, 'r.', alpha=0.5, label='Observed Data')
+    # Plot predictive means as blue line
+    ax.plot(x_true, pred, 'b', label='Prediction')
+    # Shade between the lower and upper confidence bounds
+    if len(lower) and len(upper):
+        ax.fill_between(x=x_true, y1=lower, y2=upper, alpha=0.5, label='Confidence Interval')
+    ax.set_xlabel('Time Steps')
+    ax.set_ylabel('Price (EUR/MWhe)')
+    #ax.set_xlim(-10, 20)
+    ax.set_ylim((-20, 210))
+    ax.grid()
+    plt.suptitle(title)
+    plt.legend()
+    plt.show()
+    return
+
+
 # %%
 # plot predictions
-TEST_CASE = 0
+TEST_CASE = 345
 
 plot_predictions(
     input=scaler.inverse_transform(test_input.numpy())[TEST_CASE],
@@ -183,6 +224,6 @@ plot_predictions(
 
 # %%
 # save predictions
-np.savetxt('../data/mt_batch_ts_gp_preds.csv', preds_os, delimiter=",")
-np.savetxt('../data/mt_batch_ts_gp_lowers.csv',lowers_os,delimiter=",")
-np.savetxt('../data/mt_batch_ts_gp_uppers.csv',uppers_os,delimiter=",")
+np.save('../data/mt_batch_ts_gp_preds.npy', preds_os)
+np.save('../data/mt_batch_ts_gp_lowers.npy',lowers_os)
+np.save('../data/mt_batch_ts_gp_uppers.npy',uppers_os)

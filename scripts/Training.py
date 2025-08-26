@@ -384,4 +384,41 @@ plot_predictions(
     title=f'Neural TSGP Model Predictions\nTest Case: #{TEST_CASE}'
 )
 
+# %% [markdown]
+# ### 2.6.4 TSMixer Extension for Time-series GP Model
+ 
 # %%
+# training
+ts_mixer_gp = TSMixerGPModel(inducing_points, horizon=HORIZON, lookback=LOOKBACK, num_latents_svgp=NUM_LATENTS_SVGP, num_latents_lfe=NUM_LATENTS_LFE)
+
+
+# %%
+ts_mixer_gp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=10)
+
+# %%
+# Inference with TSMixer GP
+ts_mixer_gp_preds, ts_mixer_gp_lowers, ts_mixer_gp_uppers = ts_mixer_gp.infer(test_input)
+
+# %%
+# separate predictions and confidence interval
+ts_mixer_gp_preds = scaler.inverse_transform(ts_mixer_gp_preds.detach().numpy())
+ts_mixer_gp_lowers = scaler.inverse_transform(ts_mixer_gp_lowers.detach().numpy())
+ts_mixer_gp_uppers = scaler.inverse_transform(ts_mixer_gp_uppers.detach().numpy())
+
+# %%
+# export
+np.save(os.path.join(DATA_DIR, 'ts_mixer_gp_preds.npy'), ts_mixer_gp_preds)
+np.save(os.path.join(DATA_DIR, 'ts_mixer_gp_lowers.npy'), ts_mixer_gp_lowers)
+np.save(os.path.join(DATA_DIR, 'ts_mixer_gp_uppers.npy'), ts_mixer_gp_uppers)
+
+# %%
+# visualization
+TEST_CASE = 666
+plot_predictions(
+    test_input_os[TEST_CASE],
+    test_true_os[TEST_CASE],
+    ts_mixer_gp_preds[TEST_CASE],
+    ts_mixer_gp_lowers[TEST_CASE],
+    ts_mixer_gp_uppers[TEST_CASE],
+    title=f'TS Mixer NeuralGP Model Predictions\nTest Case: #{TEST_CASE}'
+)

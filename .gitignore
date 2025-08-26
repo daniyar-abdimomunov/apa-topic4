@@ -79,7 +79,7 @@ target/
 .ipynb_checkpoints
 *.ipynb
 notebooks/
-models/
+# models/
 
 # IPython
 profile_default/

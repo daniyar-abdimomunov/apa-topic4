@@ -381,7 +381,7 @@ plot_predictions(
     patch_tst_gp_preds[TEST_CASE],
     patch_tst_gp_lowers[TEST_CASE],
     patch_tst_gp_uppers[TEST_CASE],
-    title=f'Neural TSGP Model Predictions\nTest Case: #{TEST_CASE}'
+    title=f'PatchTST Neural GP Model Predictions\nTest Case: #{TEST_CASE}'
 )
 
 # %% [markdown]

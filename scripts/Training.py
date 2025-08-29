@@ -34,15 +34,16 @@ eu_df
 
 # %%
 # define train-test split and prediction parameters
-LOOKBACK = 192
-HORIZON = 96
+LOOKBACK = 168
+HORIZON = 24
 NUM_TRAIN_SAMPLES = 3000 + LOOKBACK + HORIZON - 1
 NUM_TEST_SAMPLES = 1000 + LOOKBACK + HORIZON - 1
 
 # %%
 # split data into train and test datasets
-train  = eu_df[:NUM_TRAIN_SAMPLES][['Germany (EUR/MWhe)', 'Austria (EUR/MWhe)']].to_numpy()
-test = eu_df[NUM_TRAIN_SAMPLES:NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES][['Germany (EUR/MWhe)', 'Austria (EUR/MWhe)']].to_numpy()
+countries = ['Germany (EUR/MWhe)', 'Austria (EUR/MWhe)']
+train  = eu_df[:NUM_TRAIN_SAMPLES][countries].to_numpy()
+test = eu_df[NUM_TRAIN_SAMPLES:NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES][countries].to_numpy()
 print(f'Train dataset shape: {train.shape}\n'
       f'Test dataset shape: {test.shape}\n')
 
@@ -106,7 +107,7 @@ ts_mixer = MTSMixer(
 )
 
 # %%
-ts_mixer.fit(train_loader, device='cpu', epochs=10, lr=1e-3)
+ts_mixer.fit(train_loader, device='cpu', epochs=15, lr=1e-3)
 
 # %%
 ts_mixer_preds, _ = ts_mixer.predict(test_loader, device='cpu')
@@ -137,7 +138,7 @@ test_loader_patch = DataLoader(PatchTSTDataset(test_input, test_true), batch_siz
 patch_TST = PatchTST(
     num_variables=train_input.size(-1),  # number of variables in the time series
     seq_len=LOOKBACK,
-    patch_size=16, # must be a divisor of LOOKBACK
+    patch_size=21, # must be a divisor of LOOKBACK
     embed_dim=128,  # embedding dimension
     num_layers=3,
     num_heads=4,
@@ -146,7 +147,7 @@ patch_TST = PatchTST(
 )
 
 # %%
-patch_TST.fit(train_loader_patch, device='cpu', epochs=15, lr=1e-3)
+patch_TST.fit(train_loader_patch, device='cpu', epochs=25, lr=1e-3)
 
 # %%
 patch_TST_preds, trues = patch_TST.predict(test_loader_patch, device='cpu')
@@ -165,35 +166,42 @@ plot_predictions(
     patch_TST_preds_os[TEST_CASE],
     title=f'Patch TST Predictions\nTest Case: #{TEST_CASE}')
 
+
 # %% [markdown]
 # ### 2.3 Distributional Neural Network (DNN)
 
 # %%
+"""
 # TO-DO: train DNN model and export predictions
 dnn = ...
 dnn.train(train_input, train_true)
-
+"""
 # %%
+"""
 dnn.evaluate(test_input, test_true)
+"""
 
 # %%
+"""
 dnn_pred = dnn.pred(test_input)
 dnn_lowers = ...
 dnn_uppers = ...
 dnn_pred # NOTE: for probabilistic models we should get predictions in dimensions  (n, m), where n is the number of predicted time-steps, and m is the number of samples
-
+"""
 # %%
+"""
 np.savetxt(os.path.join(DATA_DIR, 'dnn_preds.csv'), dnn_pred, delimiter=",")
 np.savetxt(os.path.join(DATA_DIR, 'dnn_lowers.csv'), dnn_lowers, delimiter=",")
 np.savetxt(os.path.join(DATA_DIR, 'dnn_uppers.csv'), dnn_uppers, delimiter=",")
-
+"""
 # %% [markdown]
 # ### 2.4 LLMTime
 
 # %%
+"""
 # TO-DO: train LLMTime model and export predictions
 ...
-
+"""
 # %% [markdown]
 # ### 2.5 Sundial Model
 # Sundial is a pre-trained model for Time-Series Forecasting.
@@ -309,11 +317,11 @@ plot_predictions(
 
 # %%
 # training
-NUM_LATENTS_LFE = 16
+NUM_LATENTS_LFE = 8
 neural_tsgp = NeuralTSGPModel(inducing_points, HORIZON, num_latents_svgp=NUM_LATENTS_SVGP, num_latents_lfe=NUM_LATENTS_LFE)
 
 # %%
-neural_tsgp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=25)
+neural_tsgp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=100)
 
 # %%
 # Inference with Neural TSGP
@@ -350,11 +358,11 @@ plot_predictions(
 
 # %%
 # training
-patch_tst_gp = PatchTSTGPModel(inducing_points, HORIZON, LOOKBACK, num_latents_svgp=NUM_LATENTS_SVGP, num_layers=6, embed_dim=8)
+patch_tst_gp = PatchTSTGPModel(inducing_points, HORIZON, LOOKBACK, num_latents_svgp=NUM_LATENTS_SVGP, num_layers=6, patch_size=21, embed_dim=8)
 
 
 # %%
-patch_tst_gp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=10)
+patch_tst_gp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=100)
 
 # %%
 # Inference with PatchTST GP
@@ -393,7 +401,7 @@ ts_mixer_gp = TSMixerGPModel(inducing_points, horizon=HORIZON, lookback=LOOKBACK
 
 
 # %%
-ts_mixer_gp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=10)
+ts_mixer_gp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=100)
 
 # %%
 # Inference with TSMixer GP

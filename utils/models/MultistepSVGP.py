@@ -1,8 +1,9 @@
 from gpytorch import Module
+import gpytorch
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.kernels import RBFKernel, ScaleKernel
 from gpytorch.likelihoods import MultitaskGaussianLikelihood
-from gpytorch.means import ConstantMean
+from gpytorch.means import ConstantMean,LinearMean
 from gpytorch.mlls import VariationalELBO
 from gpytorch.models import ApproximateGP
 from gpytorch.settings import fast_pred_var
@@ -40,7 +41,7 @@ class MultistepSVGP(ApproximateGP):
 
         # Mean and covariance modules
         input_dim = inducing_points.size(1)  # input_dim (d0) = lookback (L) * num_features (V); i.e. flattened input
-        self.mean_module = ConstantMean()
+        self.mean_module = LinearMean(input_dim)
         self.covar_module = ScaleKernel(RBFKernel(ard_num_dims=input_dim))
 
     def forward(self, x):

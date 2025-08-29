@@ -25,7 +25,7 @@ class TSMixerFeatureExtractor(Module):
 
 class TSMixerGPModel(TSGPModel):
     def __init__(self, inducing_points, horizon, lookback, num_latents_svgp, num_latents_lfe,
-                 grid_bounds=(-1., 1.)):
+                 grid_bounds=(-1., 1.), num_blocks=3, hidden_dim=64, activation='gelu'):
         
         num_input_vars = int(inducing_points.size(-1))
 
@@ -41,7 +41,10 @@ class TSMixerGPModel(TSGPModel):
         self.ts_mixer_layer = TSMixerFeatureExtractor(
             num_variables=num_input_vars,
             time_steps=lookback,
-            latent_dimension=num_latents_lfe
+            latent_dimension=num_latents_lfe,
+            num_blocks=num_blocks,
+            hidden_dim=hidden_dim,
+            activation=activation
         )
 
         self.scale_to_bounds = ScaleToBounds(*grid_bounds)

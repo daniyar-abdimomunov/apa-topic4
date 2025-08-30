@@ -4,6 +4,7 @@ from utils.models.MultistepSVGP import TSGPModel
 
 
 class LargeFeatureExtractor(Sequential):
+    # Simple 4-layer MLP used to map inputs to latent features for the GP
     def __init__(self, input_dim, latent_dimension):
         super(LargeFeatureExtractor, self).__init__()
         self.add_module('linear1', Linear(input_dim, 1000))
@@ -16,11 +17,17 @@ class LargeFeatureExtractor(Sequential):
 
 
 class NeuralTSGPModel(TSGPModel):
+    """
+    TSGP variant with a learnable feature extractor :
+    - Projects inputs with LargeFeatureExtractor
+    - Scales features to fixed bounds for stable GP behavior
+    """
     def __init__(self, inducing_points, horizon, num_latents_svgp, num_latents_lfe, grid_bounds=(-1., 1.)):
         num_input_vars = inducing_points.size(-1)
         latent_feature_extractor = LargeFeatureExtractor(num_input_vars, latent_dimension=num_latents_lfe)
         scale_to_bounds = ScaleToBounds(grid_bounds[0], grid_bounds[1])
 
+        # Transform initial inducing points through the feature extractor
         inducing_points = latent_feature_extractor(inducing_points)
         inducing_points = scale_to_bounds(inducing_points)
         super().__init__(inducing_points, horizon, num_latents_svgp)
@@ -29,6 +36,7 @@ class NeuralTSGPModel(TSGPModel):
         self.scale_to_bounds = scale_to_bounds
 
     def forward(self, x):
+        # Apply feature extactor + scaling , then call parent GP forward
         projected_x = self.latent_feature_extractor(x)
         projected_x = self.scale_to_bounds(projected_x)
 

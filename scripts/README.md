@@ -16,6 +16,14 @@ If Jupytext doesn't sync automatically or paired files do not exist locally, run
 
 ```jupytext --sync scripts/*.py```
 
+To convert an individual .py file (e.g. Training.py) run:
+
+```jupytext --sync scripts/Training.py```
+
 To convert .ipynb files to .py files run:
 
 ```jupytext --sync notebooks/*.ipynb```
+
+To convert an individual .ipynb files (e.g. Training.ipynb) run:
+
+```jupytext --sync notebooks/Training.ipynb```

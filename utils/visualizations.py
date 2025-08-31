@@ -15,6 +15,7 @@ from typing import Any,Dict,Tuple
 # %%
 def _reduce_dimension(array: np.ndarray) -> np.ndarray:
     return array.mean(axis=1) if len(array.shape) > 1 else array
+
 def compare_scores(benchmarking: Dict[str,Dict[str,Any]]) -> Tuple[plt.Figure, Any]:
     model_names=[]
     metrics_data=[]
@@ -27,8 +28,8 @@ def compare_scores(benchmarking: Dict[str,Dict[str,Any]]) -> Tuple[plt.Figure, A
     #one figure per metric
     figures={}
     for metric in df.columns:
-        fig,ax=plt.subplots(figsize=(7,4))
-        df[metric].plot(kind='bar',ax=ax)
+        fig,ax=plt.subplots(figsize=(10,4))
+        df[metric].plot(kind='barh',ax=ax)
         ax.set_title(f"{metric.upper()} Comparison Across Models")
         ax.set_xlabel("Model")
         ax.set_ylabel(metric.upper())
@@ -41,14 +42,18 @@ def compare_scores(benchmarking: Dict[str,Dict[str,Any]]) -> Tuple[plt.Figure, A
 
 # TO-DO: Create visualizations comparing predictions of different models
 def compare_single_prediction(y_input, y_true, benchmarking: dict, test_case: int) -> Tuple[plt.Figure, Any]:
-    ...
     fig, ax = plt.subplots(figsize=(10,6))
     y_input = y_input[test_case]
     y_true = y_true[test_case]
     x_input = list(range(-y_input.shape[0], 0))
     x = list(range(y_true.shape[0]))
 
-    plt.plot(x_input, y_input, 'k-',label='Input Data')
+
+    num_variables = y_input.shape[1] if len(y_input.shape) > 1 else 1
+    input_labels = [None] * num_variables
+    input_labels[0] = 'Input Data'
+
+    plt.plot(x_input, y_input, 'k-',label=input_labels)
     plt.plot(x, y_true, '.', label='Observed Data', color='red')
 
     for model_key,model in benchmarking.items():
@@ -83,7 +88,10 @@ def plot_predictions(
     f, ax = plt.subplots(1, 1, figsize=(14, 5), layout='tight')
 
     # Plot training data as black stars
-    ax.plot(x_input, input, 'g', label='Input Data')
+    num_variables = input.shape[1] if len(input.shape) > 1 else 1
+    input_labels = [None] * num_variables
+    input_labels[0] = 'Input Data'
+    ax.plot(x_input, input, 'g', label=input_labels)
     # Plot predictive means as blue line
     ax.plot(x_true, true, 'r.', alpha=0.5, label='Observed Data')
     # Plot predictive means as blue line
@@ -108,7 +116,7 @@ def compare_multi_predictions(y_inputs, y_trues, benchmarking: dict, test_cases:
         for j, test_case in enumerate(test_cases):
             ax = axs[i, j]
             if j == 0:
-                ax.set_ylabel(model['name'], size=18)
+                ax.set_ylabel(model['name'], size=18, rotation='horizontal', ha='right')
             if i == 0:
                 ax.set_title(f'Test Case: #{test_case}', size=18)
             y_input = y_inputs[test_case]
@@ -116,7 +124,11 @@ def compare_multi_predictions(y_inputs, y_trues, benchmarking: dict, test_cases:
             x_input = list(range(-y_input.shape[0], 0))
             x = list(range(y_true.shape[0]))
 
-            ax.plot(x_input, y_input, 'k-', label='Input Data')
+            num_variables = y_input.shape[1] if len(y_input.shape) > 1 else 1
+            input_labels = [None] * num_variables
+            input_labels[0] = 'Input Data'
+
+            ax.plot(x_input, y_input, 'k-', label=input_labels)
             ax.plot(x, y_true, '.', label='Observed Data', color='red')
 
             if 'lower' in model and 'upper' in model:
@@ -129,7 +141,7 @@ def compare_multi_predictions(y_inputs, y_trues, benchmarking: dict, test_cases:
 
     fig.suptitle(f"Model Forecast comparison", size=28)
     fig.supxlabel("Time-steps", size=18)
-    plt.legend()
+    plt.legend(bbox_to_anchor=(1,1))
     plt.tight_layout()
 
     return fig, axs

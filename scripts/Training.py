@@ -2,6 +2,7 @@
 # # Benchmark Model Training
 
 # %%
+import numpy as np
 # %load_ext autoreload
 # %autoreload 2
 
@@ -10,6 +11,7 @@ import pickle
 from sklearn.preprocessing import StandardScaler
 import sys
 import torch
+from torch.utils.data import TensorDataset
 from transformers import AutoModelForCausalLM
 
 PROJECT_ROOT = os.path.dirname(os.getcwd())
@@ -32,57 +34,52 @@ eu_df
 
 # %%
 # define train-test split and prediction parameters
-LOOKBACK = 192 #number of past time steps used as input
-HORIZON = 96   #number of future time steps to predict 
-NUM_TRAIN_SAMPLES = 3000 + LOOKBACK + HORIZON - 1 #train samples
-NUM_TEST_SAMPLES = 1000 + LOOKBACK + HORIZON - 1  #test sapmles
+LOOKBACK = 192
+HORIZON = 96
+NUM_TRAIN_SAMPLES = 3000 + LOOKBACK + HORIZON - 1
+NUM_TEST_SAMPLES = 1000 + LOOKBACK + HORIZON - 1
+
 # %%
-# split the dataset into train and test sets then show the shapes of the resulting arrays
-train  = eu_df[:NUM_TRAIN_SAMPLES]['Germany (EUR/MWhe)'].to_numpy()
-test = eu_df[NUM_TRAIN_SAMPLES:NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES]['Germany (EUR/MWhe)'].to_numpy()
+# split data into train and test datasets
+train  = eu_df[:NUM_TRAIN_SAMPLES][['Germany (EUR/MWhe)', 'Austria (EUR/MWhe)']].to_numpy()
+test = eu_df[NUM_TRAIN_SAMPLES:NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES][['Germany (EUR/MWhe)', 'Austria (EUR/MWhe)']].to_numpy()
 print(f'Train dataset shape: {train.shape}\n'
       f'Test dataset shape: {test.shape}\n')
 
 # %%
 # Scale the data (i.e. electricity prices)
-# Standardize the training and test datasets
 scaler = StandardScaler()
-# Fit the scaler on the training data 
 scaler.fit(train.reshape(-1, 1))
-# Apply the transformation and reshape back to 1D
-train_scaled = scaler.transform(train.reshape(-1, 1)).reshape(-1)
-test_scaled = scaler.transform(test.reshape(-1, 1)).reshape(-1)
+train_scaled = scaler.transform(train.reshape(-1, 1)).reshape(train.shape)
+test_scaled = scaler.transform(test.reshape(-1, 1)).reshape(test.shape)
 
-# Print statistics before and after scaling to verify standadization 
 print(f'Original Train dataset  mean: {round(train.mean(), 2)}; \tstd: {round(train.std(), 2)}\n'
       f'Scaled Train dataset    mean: {round(train_scaled.mean(), 2)}; \t\tstd: {round(train_scaled.std(), 2)}\n'
       f'Scaled Test dataset     mean: {round(test_scaled.mean(), 2)}; \tstd: {round(test_scaled.std(), 2)}\n')
 
 # %%
 # re-shape model into set of sequences,
-# Prepare sequential datasets for training and testing 
 train_input, train_true = sequentialize(train_scaled, LOOKBACK, HORIZON)
 test_input, test_true = sequentialize(test_scaled, LOOKBACK, HORIZON)
-# Convert arrays to Pytorch tensors
+
 train_input = torch.Tensor(train_input)
-train_true = torch.Tensor(train_true)
+train_true = torch.Tensor(train_true[:, : , 0]) # we only want to make predictions for one of the countries, so we select the first one (i.e. Germany) as our true values
 test_input = torch.Tensor(test_input)
-test_true = torch.Tensor(test_true)
-# Display the shapes of the prepared datasets
+test_true = torch.Tensor(test_true[:, : , 0]) # we only want to make predictions for one of the countries, so we select the first one (i.e. Germany) as our true values
+
 print('Shape of predictor inputs: ',train_input.shape)
 print('Shape of outputs: ',train_true.shape)
 print('Shape of test predictor inputs: ',test_input.shape)
 print('Shape of test outputs: ',test_true.shape)
 
 # %%
-# Convert scaled test data back to the original feature space ( Undo standardization)
-test_input_os = scaler.inverse_transform(test_input.numpy())
+test_input_os = scaler.inverse_transform(test_input.reshape(test_input.shape[0], -1).numpy()).reshape(test_input.shape)
 test_true_os = scaler.inverse_transform(test_true.numpy())
 
 # %%
 # save test data
-np.savetxt('../data/inputs.csv', test_input_os, delimiter=",")
-np.savetxt('../data/trues.csv', test_true_os,delimiter=",")
+np.save('../data/inputs.npy', test_input_os)
+np.save('../data/trues.npy', test_true_os)
 
 # %% [markdown]
 # ## 2. Model Training
@@ -94,41 +91,37 @@ np.savetxt('../data/trues.csv', test_true_os,delimiter=",")
 # ### 2.1 TSMixer
 
 # %%
-
-#Prepare DataLoaders for training and testing.
-train_loader = DataLoader(MTSMixerDataset(train_input.unsqueeze(-1), train_true), batch_size=32, shuffle=True)
-test_loader = DataLoader(MTSMixerDataset(test_input.unsqueeze(-1), test_true), batch_size=32)
+train_loader = DataLoader(MTSMixerDataset(train_input, train_true), batch_size=32, shuffle=True)
+test_loader = DataLoader(MTSMixerDataset(test_input, test_true), batch_size=32)
 
 # %%
-# Initialize the MTSMixer model 
+# TO-DO: train TSMixer model and export predictions
 ts_mixer = MTSMixer(
-    num_variables= 1,    # Number of input variables
-    time_steps=LOOKBACK, # Length of the input sequence 
-    output_steps=HORIZON,# Number of steps to predict into the future
-    num_blocks=3,        # Number of mixer blocks in the architecture 
-    hidden_dim=64,       # Dimension of hidden layers inside the model 
-    activation='gelu'    # non-linear activation function used in the network
+    num_variables=train_input.size(-1),
+    time_steps=LOOKBACK,
+    output_steps=HORIZON,
+    num_blocks=3,
+    hidden_dim=64,
+    activation='gelu'
 )
 
 # %%
-#Train the MTSMixer model 
-ts_mixer.fit(train_loader, device='cpu', epochs=2, lr=1e-3)
+ts_mixer.fit(train_loader, device='cpu', epochs=10, lr=1e-3)
 
 # %%
-# Generate prediction with the trained MTSMixer model 
-ts_mixer_preds, trues = ts_mixer.predict(test_loader, device='cpu')
+ts_mixer_preds, _ = ts_mixer.predict(test_loader, device='cpu')
 ts_mixer_preds_os = scaler.inverse_transform(ts_mixer_preds)
 
 # %%
-np.savetxt(os.path.join(DATA_DIR, 'ts_mixer_pred.csv'), ts_mixer_preds_os, delimiter=",")
+np.save(os.path.join(DATA_DIR, 'ts_mixer_pred.npy'), ts_mixer_preds_os)
 
 # %%
 # visualize predictions and confidence interval
-TEST_CASE = 0
+TEST_CASE = 567
 
 plot_predictions(
-    scaler.inverse_transform(test_input.numpy())[TEST_CASE],
-    scaler.inverse_transform(test_true.numpy())[TEST_CASE],
+    test_input_os[TEST_CASE],
+    test_true_os[TEST_CASE],
     ts_mixer_preds_os[TEST_CASE],
     title=f'TS Mixer Predictions\nTest Case: #{TEST_CASE}')
 
@@ -136,44 +129,38 @@ plot_predictions(
 # ### 2.2 PatchTST
 
 # %%
-# Prepare DataLoaders for the PatchTST model 
-
-train_loader_patch = DataLoader(PatchTSTDataset(train_input.unsqueeze(-1), train_true),
-                                batch_size=32, shuffle=True)
-test_loader_patch = DataLoader(PatchTSTDataset(test_input.unsqueeze(-1), test_true),
-                               batch_size=32)
+train_loader_patch = DataLoader(PatchTSTDataset(train_input, train_true), batch_size=32, shuffle=True)
+test_loader_patch = DataLoader(PatchTSTDataset(test_input, test_true), batch_size=32)
 
 # %%
-# Initialize the PatchTST model
+# TO-DO: train PatchTST model and export predictions
 patch_TST = PatchTST(
-    num_variables=1,     # Number of input features in the time series
-    seq_len=LOOKBACK,    # Length of the input sequence 
-    patch_size=16,       # Size of each patch (Must be a divisor of LOOKBACK )
-    embed_dim=128,       # Dimension of the embedding space
-    num_layers=3,        # Number of transformer encoder layers 
-    num_heads=4,         # Number of attention heads per layer
-    output_steps=HORIZON,# Number of future steps to predict  
-    dropout=0.1          # Dropout rate for regularization
+    num_variables=train_input.size(-1),  # number of variables in the time series
+    seq_len=LOOKBACK,
+    patch_size=16, # must be a divisor of LOOKBACK
+    embed_dim=128,  # embedding dimension
+    num_layers=3,
+    num_heads=4,
+    output_steps=HORIZON,
+    dropout=0.1
 )
-# Train the patchTST model 
-patch_TST.fit(train_loader_patch, device='cpu', epochs=2, lr=1e-3)
+
+patch_TST.fit(train_loader_patch, device='cpu', epochs=15, lr=1e-3)
 
 # %%
-# Generate predictions with the trained PatchTST model
-
 patch_TST_preds, trues = patch_TST.predict(test_loader_patch, device='cpu')
 patch_TST_preds_os = scaler.inverse_transform(patch_TST_preds)
 
 # %%
-np.savetxt(os.path.join(DATA_DIR, 'patch_TST_pred.csv'), patch_TST_preds_os, delimiter=",")
+np.save(os.path.join(DATA_DIR, 'patch_TST_pred.npy'), patch_TST_preds_os)
 
 # %%
 # visualize predictions and confidence interval
-TEST_CASE = 0
+TEST_CASE = 789
 
 plot_predictions(
-    scaler.inverse_transform(test_input.numpy())[TEST_CASE],
-    scaler.inverse_transform(test_true.numpy())[TEST_CASE],
+    test_input_os[TEST_CASE],
+    test_true_os[TEST_CASE],
     patch_TST_preds_os[TEST_CASE],
     title=f'Patch TST Predictions\nTest Case: #{TEST_CASE}')
 
@@ -214,12 +201,19 @@ np.savetxt(os.path.join(DATA_DIR, 'dnn_uppers.csv'), dnn_uppers, delimiter=",")
 # %%
 # load model and dataset
 model = AutoModelForCausalLM.from_pretrained('thuml/sundial-base-128m', trust_remote_code=True)
-df = pd.read_csv("https://raw.githubusercontent.com/WenWeiTHU/TimeSeriesDatasets/refs/heads/main/ETT-small/ETTh2.csv")
+
+# %%
+test_input_univariate = test_input[:, :, 0]
+test_input_univariate_os = scaler.inverse_transform(test_input_univariate)
+test_input_univariate.shape
 
 # %%
 # forecasting configurations
 NUM_SAMPLES = 20           # generate 20 samples
-forecast = model.generate(test_input, max_new_tokens=HORIZON, num_samples=NUM_SAMPLES) # generate 20 probable predictions
+forecast = model.generate(
+    test_input_univariate, # take only samples from Germany to predict prices for Germany
+    max_new_tokens=HORIZON,
+    num_samples=NUM_SAMPLES) # generate 20 probable predictions
 print(f'Predictions shape: {forecast.shape}\n'
       f'{forecast.shape[0]} - test cases\n'
       f'{forecast.shape[1]} - prediction samples\n'
@@ -228,14 +222,17 @@ print(f'Predictions shape: {forecast.shape}\n'
 # %%
 # separate predictions and confidence interval
 sundial_preds = scaler.inverse_transform(forecast.mean(dim=1))
-sundial_lowers = scaler.inverse_transform(forecast.quantile(q=0.05, dim=1))
-sundial_uppers = scaler.inverse_transform(forecast.quantile(q=0.95, dim=1))
+sundial_lowers = scaler.inverse_transform(forecast.quantile(q=0.025, dim=1))
+sundial_uppers = scaler.inverse_transform(forecast.quantile(q=0.975, dim=1))
 
 # %%
 # export forecast outputs for benchmarking
-np.savetxt('../data/sundial_preds.csv',sundial_preds,delimiter=",")
-np.savetxt('../data/sundial_lowers.csv',sundial_lowers,delimiter=",")
-np.savetxt('../data/sundial_uppers.csv',sundial_uppers,delimiter=",")
+np.save('../data/sundial_preds.npy', sundial_preds)
+np.save('../data/sundial_lowers.npy', sundial_lowers)
+np.save('../data/sundial_uppers.npy', sundial_uppers)
+
+# %%
+forecast[TEST_CASE].transpose(1, 0).shape
 
 # %%
 # visualize raw predictions
@@ -243,7 +240,7 @@ TEST_CASE = 666
 
 plt.figure(figsize=(15, 5))
 plt.xlim(0, LOOKBACK + HORIZON)
-plt.plot(np.arange(LOOKBACK), test_input[TEST_CASE], color='black')
+plt.plot(np.arange(LOOKBACK), test_input_univariate[TEST_CASE], color='black')
 plt.plot(np.arange(LOOKBACK, LOOKBACK + HORIZON), forecast[TEST_CASE].transpose(1, 0))
 plt.grid()
 plt.show()
@@ -251,9 +248,95 @@ plt.show()
 # %%
 # visualize predictions and confidence interval
 plot_predictions(
-    scaler.inverse_transform(test_input.numpy())[TEST_CASE],
-    scaler.inverse_transform(test_true.numpy())[TEST_CASE],
+    test_input_univariate_os[TEST_CASE],
+    test_true_os[TEST_CASE],
     sundial_preds[TEST_CASE],
     sundial_lowers[TEST_CASE],
     sundial_uppers[TEST_CASE],
     title=f'Sundial Model Predictions\nTest Case: #{TEST_CASE}')
+
+# %% [markdown]
+# ## 2.6 GP Extensions
+
+# %%
+train_dataset = TensorDataset(train_input, train_true)
+train_loader_svgp = DataLoader(train_dataset, batch_size=16, shuffle=True) # batch_size (M), batch shape = ([M, L, V0], [M, H, V1])
+
+# %%
+NUM_INDUCING_POINTS = 200 # num_inducing_points (P)
+NUM_LATENTS_SVGP = 8 # num_latents_svgp (lf0)
+inducing_points = train_input[:NUM_INDUCING_POINTS]
+
+# %% [markdown]
+# ### 2.6.1 Base Multistep SVGP
+
+ # %%
+ # subset of training inputs
+tsgp_model = TSGPModel(inducing_points, HORIZON, num_latents_svgp=NUM_LATENTS_SVGP)
+tsgp_model.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=100)
+
+# %%
+# Inference with TSGP
+tsgp_preds, tsgp_lowers, tsgp_uppers = tsgp_model.infer(test_input, true_shape=test_true.shape)
+
+# %%
+# separate predictions and confidence interval
+tsgp_preds = scaler.inverse_transform(tsgp_preds.detach().numpy())
+tsgp_lowers = scaler.inverse_transform(tsgp_lowers.detach().numpy())
+tsgp_uppers = scaler.inverse_transform(tsgp_uppers.detach().numpy())
+
+# %%
+# export forecast outputs for benchmarking
+np.save(os.path.join(DATA_DIR, 'tsgp_preds.npy'), tsgp_preds)
+np.save(os.path.join(DATA_DIR, 'tsgp_lowers.npy'),tsgp_lowers)
+np.save(os.path.join(DATA_DIR, 'tsgp_uppers.npy'),tsgp_uppers)
+
+# %%
+# visualize predictions and confidence interval
+TEST_CASE = 0
+plot_predictions(
+    test_input_os[TEST_CASE],
+    test_true_os[TEST_CASE],
+    tsgp_preds[TEST_CASE],
+    tsgp_lowers[TEST_CASE],
+    tsgp_uppers[TEST_CASE],
+    title=f'TSGP Model Predictions\nTest Case: #{TEST_CASE}'
+)
+
+# %% [markdown]
+# ## 2.6.2 Neural SVGP
+
+# %%
+# training
+neural_tsgp = NeuralTSGPModel(inducing_points, HORIZON, num_latents_svgp=10, num_latents_lfe=16)
+neural_tsgp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=10)
+
+# %%
+# Inference with Neural TSGP
+neural_tsgp_preds, neural_tsgp_lowers, neural_tsgp_uppers = neural_tsgp.infer(test_input, true_shape=test_true.shape)
+
+# %%
+# separate predictions and confidence interval
+neural_tsgp_preds = scaler.inverse_transform(neural_tsgp_preds.detach().numpy())
+neural_tsgp_lowers = scaler.inverse_transform(neural_tsgp_lowers.detach().numpy())
+neural_tsgp_uppers = scaler.inverse_transform(neural_tsgp_uppers.detach().numpy())
+
+# %%
+# export
+np.save(os.path.join(DATA_DIR, 'neural_tsgp_preds.npy'), neural_tsgp_preds)
+np.save(os.path.join(DATA_DIR, 'neural_tsgp_lowers.npy'), neural_tsgp_lowers)
+np.save(os.path.join(DATA_DIR, 'neural_tsgp_uppers.npy'), neural_tsgp_uppers)
+
+# %%
+# visualization
+TEST_CASE = 666
+plot_predictions(
+    test_input_os[TEST_CASE],
+    test_true_os[TEST_CASE],
+    neural_tsgp_preds[TEST_CASE],
+    neural_tsgp_lowers[TEST_CASE],
+    neural_tsgp_uppers[TEST_CASE],
+    title=f'Neural TSGP Model Predictions\nTest Case: #{TEST_CASE}'
+)
+
+# %%

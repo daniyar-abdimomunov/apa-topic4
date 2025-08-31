@@ -5,3 +5,5 @@ from utils.models.PatchTST import *
 from utils.models.TSMixer import *
 from utils.models.MultistepSVGP import *
 from utils.models.NeuralTSGP import *
+from utils.models.TSMixerGP import *
+from utils.models.PatchTSTGP import *

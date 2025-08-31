@@ -2,6 +2,7 @@ from torch.nn import Sequential, Linear, ReLU
 from gpytorch.utils.grid import ScaleToBounds
 from utils.models.MultistepSVGP import TSGPModel
 
+
 class LargeFeatureExtractor(Sequential):
     def __init__(self, input_dim, latent_dimension):
         super(LargeFeatureExtractor, self).__init__()
@@ -27,9 +28,17 @@ class NeuralTSGPModel(TSGPModel):
         self.latent_feature_extractor = latent_feature_extractor
         self.scale_to_bounds = scale_to_bounds
 
-
     def forward(self, x):
         projected_x = self.latent_feature_extractor(x)
         projected_x = self.scale_to_bounds(projected_x)
 
         return super().forward(projected_x)
+
+    def train_model(self, *args, **kwargs):
+        self.latent_feature_extractor.train()
+        super().train_model(add_optimizer_params=[{'params': self.latent_feature_extractor.parameters()}], *args,
+                            **kwargs)
+
+    def infer(self, *args, **kwargs):
+        self.latent_feature_extractor.eval()
+        return super().infer(*args, **kwargs)

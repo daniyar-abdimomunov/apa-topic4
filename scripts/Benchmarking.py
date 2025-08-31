@@ -50,13 +50,40 @@ print(f'shape of trues: {trues.shape}\n'
       f'shape of uppers: {sundial_uppers.shape}')
 
 # %%
-#gp_preds = np.load(os.path.join(DATA_DIR, 'mt_batch_ts_gp_preds.npy'))
-#gp_lowers = np.load(os.path.join(DATA_DIR, 'mt_batch_ts_gp_lowers.npy'))
-#gp_uppers = np.load(os.path.join(DATA_DIR, 'mt_batch_ts_gp_uppers.npy'))
-#print(f'shape of true: {trues.shape}\n'
-#      f'shape of preds: {gp_preds.shape}\n'
-#      f'shape of lowers: {gp_lowers.shape}\n'
-#      f'shape of uppers: {gp_uppers.shape}')
+tsgp_preds = np.load(os.path.join(DATA_DIR, 'tsgp_preds.npy'))
+tsgp_lowers = np.load(os.path.join(DATA_DIR, 'tsgp_lowers.npy'))
+tsgp_uppers = np.load(os.path.join(DATA_DIR, 'tsgp_uppers.npy'))
+print(f'shape of true: {trues.shape}\n'
+      f'shape of preds: {tsgp_preds.shape}\n'
+      f'shape of lowers: {tsgp_lowers.shape}\n'
+      f'shape of uppers: {tsgp_uppers.shape}')
+
+#%%
+neural_tsgp_preds = np.load(os.path.join(DATA_DIR, 'neural_tsgp_preds.npy'))
+neural_tsgp_lowers = np.load(os.path.join(DATA_DIR, 'neural_tsgp_lowers.npy'))
+neural_tsgp_uppers = np.load(os.path.join(DATA_DIR, 'neural_tsgp_uppers.npy'))
+print(f'shape of true: {trues.shape}\n'
+      f'shape of preds: {neural_tsgp_preds.shape}\n'
+      f'shape of lowers: {neural_tsgp_lowers.shape}\n'
+      f'shape of uppers: {neural_tsgp_uppers.shape}')
+
+#%%
+patch_tst_gp_preds = np.load(os.path.join(DATA_DIR, 'patch_tst_gp_preds.npy'))
+patch_tst_gp_lowers = np.load(os.path.join(DATA_DIR, 'patch_tst_gp_lowers.npy'))
+patch_tst_gp_uppers = np.load(os.path.join(DATA_DIR, 'patch_tst_gp_uppers.npy'))
+print(f'shape of true: {trues.shape}\n'
+      f'shape of preds: {patch_tst_gp_preds.shape}\n'
+      f'shape of lowers: {patch_tst_gp_lowers.shape}\n'
+      f'shape of uppers: {patch_tst_gp_uppers.shape}')
+
+#%%
+ts_mixer_gp_preds = np.load(os.path.join(DATA_DIR, 'ts_mixer_gp_preds.npy'))
+ts_mixer_gp_lowers = np.load(os.path.join(DATA_DIR, 'ts_mixer_gp_lowers.npy'))
+ts_mixer_gp_uppers = np.load(os.path.join(DATA_DIR, 'ts_mixer_gp_uppers.npy'))
+print(f'shape of true: {trues.shape}\n'
+      f'shape of preds: {ts_mixer_gp_preds.shape}\n'
+      f'shape of lowers: {ts_mixer_gp_lowers.shape}\n'
+      f'shape of uppers: {ts_mixer_gp_uppers.shape}')
 
 # %%
 # benchmarking structure:
@@ -88,13 +115,34 @@ benchmarking = {
             'upper': sundial_uppers,
             'metrics': dict(),
       },
-      #'timeseries_gp': {
-      #      'name': 'Time-series GP',
-      #      'pred': gp_preds,
-      #      'lower': gp_lowers,
-      #      'upper': gp_uppers,
-      #      'metrics': dict(),
-      #},
+      'timeseries_gp': {
+            'name': 'Time-series GP',
+            'pred': tsgp_preds,
+            'lower': tsgp_lowers,
+            'upper': tsgp_uppers,
+            'metrics': dict(),
+      },
+      'neural_timeseries_gp': {
+            'name': 'Neural Time-series GP',
+            'pred': neural_tsgp_preds,
+            'lower': neural_tsgp_lowers,
+            'upper': neural_tsgp_uppers,
+            'metrics': dict(),
+      },
+      'patcht_tst_timeseries_gp': {
+            'name': 'PatchTST Time-series GP',
+            'pred': patch_tst_gp_preds,
+            'lower': patch_tst_gp_lowers,
+            'upper': patch_tst_gp_uppers,
+            'metrics': dict(),
+      },
+      'ts_mixer_timeseries_gp': {
+            'name': 'TS Mixer Time-series GP',
+            'pred': ts_mixer_gp_preds,
+            'lower': ts_mixer_gp_lowers,
+            'upper': ts_mixer_gp_uppers,
+            'metrics': dict(),
+      }
 }
 
 # %% [markdown]

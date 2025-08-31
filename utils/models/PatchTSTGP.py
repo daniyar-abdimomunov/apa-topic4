@@ -1,6 +1,6 @@
 from torch.nn import Module
 from gpytorch.utils.grid import ScaleToBounds
-from utils.models.MultistepSVGP import TSGPModel
+from utils.models.TSGP import TSGPModel
 from utils.models.PatchTST import PatchTST
 
 class PatchTSTFeatureExtractor(Module):
@@ -44,10 +44,10 @@ class PatchTSTGPModel(TSGPModel):
 
         return super().forward(patched_x)
 
-    def train_model(self, *args, **kwargs):
+    def fit(self, *args, **kwargs):
         self.patch_tst_layer.train()
-        super().train_model(add_optimizer_params = [{'params': self.patch_tst_layer.parameters()}], *args,  **kwargs)
+        super().fit(add_optimizer_params = [{'params': self.patch_tst_layer.parameters()}], *args, **kwargs)
 
-    def infer(self, *args, **kwargs):
+    def predict(self, *args, **kwargs):
         self.patch_tst_layer.eval()
-        return super().infer(*args, **kwargs)
+        return super().predict(*args, **kwargs)

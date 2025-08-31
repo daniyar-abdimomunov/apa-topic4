@@ -1,6 +1,6 @@
 from torch.nn import Linear, Module, ModuleList, Flatten
 from gpytorch.utils.grid import ScaleToBounds
-from utils.models.MultistepSVGP import TSGPModel
+from utils.models.TSGP import TSGPModel
 from utils.models.TSMixer import MTSMixerBlock
 
 import torch
@@ -55,16 +55,16 @@ class TSMixerGPModel(TSGPModel):
         mixed_x = self.scale_to_bounds(mixed_x)
         return super().forward(mixed_x)
     
-    def train_model(self, *args, **kwargs):
+    def fit(self, *args, **kwargs):
         # ensure extractor is in train mode
         self.ts_mixer_layer.train()
         # add extractor params to optimizer
-        super().train_model(
+        super().fit(
             add_optimizer_params=[{'params': self.ts_mixer_layer.parameters()}],
             *args, **kwargs
         )
 
-    def infer(self, *args, **kwargs):
+    def predict(self, *args, **kwargs):
         # eval mode for extractor
         self.ts_mixer_layer.eval()
-        return super().infer(*args, **kwargs)
+        return super().predict(*args, **kwargs)

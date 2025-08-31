@@ -252,11 +252,11 @@ inducing_points = train_input[:NUM_INDUCING_POINTS]
 tsgp_model = TSGPModel(inducing_points, HORIZON, num_latents_svgp=NUM_LATENTS_SVGP)
 
 # %%
-tsgp_model.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=100)
+tsgp_model.fit(train_loader_svgp, num_data=train_input.size(0), epochs=100)
 
 # %%
 # Inference with TSGP
-tsgp_preds, tsgp_lowers, tsgp_uppers = tsgp_model.infer(test_input, true_shape=test_true.shape)
+tsgp_preds, tsgp_lowers, tsgp_uppers = tsgp_model.predict(test_input, true_shape=test_true.shape)
 
 # %%
 # separate predictions and confidence interval
@@ -294,11 +294,11 @@ NUM_LATENTS_LFE = 16
 neural_tsgp = NeuralTSGPModel(inducing_points, HORIZON, num_latents_svgp=NUM_LATENTS_SVGP, num_latents_lfe=NUM_LATENTS_LFE)
 
 # %%
-neural_tsgp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=25)
+neural_tsgp.fit(train_loader_svgp, num_data=train_input.size(0), epochs=25)
 
 # %%
 # Inference with Neural TSGP
-neural_tsgp_preds, neural_tsgp_lowers, neural_tsgp_uppers = neural_tsgp.infer(test_input, true_shape=test_true.shape)
+neural_tsgp_preds, neural_tsgp_lowers, neural_tsgp_uppers = neural_tsgp.predict(test_input, true_shape=test_true.shape)
 
 # %%
 # separate predictions and confidence interval
@@ -332,11 +332,11 @@ plot_predictions(
 patch_tst_gp = PatchTSTGPModel(inducing_points, HORIZON, LOOKBACK, num_latents_svgp=NUM_LATENTS_SVGP, num_layers=6, embed_dim=8)
 
 # %%
-patch_tst_gp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=10)
+patch_tst_gp.fit(train_loader_svgp, num_data=train_input.size(0), epochs=10)
 
 # %%
 # Inference with PatchTST GP
-patch_tst_gp_preds, patch_tst_gp_lowers, patch_tst_gp_uppers = patch_tst_gp.infer(test_input)
+patch_tst_gp_preds, patch_tst_gp_lowers, patch_tst_gp_uppers = patch_tst_gp.predict(test_input)
 
 # %%
 # separate predictions and confidence interval
@@ -371,11 +371,11 @@ ts_mixer_gp = TSMixerGPModel(inducing_points, horizon=HORIZON, lookback=LOOKBACK
 
 
 # %%
-ts_mixer_gp.train_model(train_loader_svgp, num_data=train_input.size(0), epochs=10)
+ts_mixer_gp.fit(train_loader_svgp, num_data=train_input.size(0), epochs=10)
 
 # %%
 # Inference with TSMixer GP
-ts_mixer_gp_preds, ts_mixer_gp_lowers, ts_mixer_gp_uppers = ts_mixer_gp.infer(test_input)
+ts_mixer_gp_preds, ts_mixer_gp_lowers, ts_mixer_gp_uppers = ts_mixer_gp.predict(test_input)
 
 # %%
 # separate predictions and confidence interval

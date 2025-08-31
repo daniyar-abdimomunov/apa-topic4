@@ -93,10 +93,10 @@ inducing_points.shape
 model = TSGPModel(inducing_points, horizon=HORIZON, num_latents_svgp=NUM_LATENTS_SVGP)
 
 # %%
-model.train_model(train_loader, num_data=train_input.size(0), epochs=100)
+model.fit(train_loader, num_data=train_input.size(0), epochs=100)
 
 # %%
-preds, lowers, uppers = model.infer(test_input, test_true.shape)
+preds, lowers, uppers = model.predict(test_input, test_true.shape)
 
 # %%
 # Rescale target to original scale (os)
@@ -130,10 +130,10 @@ NUM_LATENTS_LFE = 6
 model = NeuralTSGPModel(inducing_points, horizon=HORIZON, num_latents_svgp=NUM_LATENTS_SVGP, num_latents_lfe=NUM_LATENTS_LFE)
 
 # %%
-model.train_model(train_loader, num_data=train_input.size(0))
+model.fit(train_loader, num_data=train_input.size(0))
 
 # %%
-preds, lowers, uppers = model.infer(test_input, test_true.shape)
+preds, lowers, uppers = model.predict(test_input, test_true.shape)
 
 # %%
 # Rescale target to original scale (os)

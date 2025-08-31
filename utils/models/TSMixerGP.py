@@ -1,6 +1,6 @@
 from torch.nn import Linear, Module, ModuleList, Flatten
 from gpytorch.utils.grid import ScaleToBounds
-from utils.models.MultistepSVGP import TSGPModel
+from utils.models.TSGP import TSGPModel
 from utils.models.TSMixer import MTSMixerBlock
 
 import torch

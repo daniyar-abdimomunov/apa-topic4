@@ -1,6 +1,6 @@
 from torch.nn import Module
 from gpytorch.utils.grid import ScaleToBounds
-from utils.models.MultistepSVGP import TSGPModel
+from utils.models.TSGP import TSGPModel
 from utils.models.PatchTST import PatchTST
 
 class PatchTSTFeatureExtractor(Module):

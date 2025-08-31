@@ -32,13 +32,12 @@ eu_df
 
 # %%
 # define train-test split and prediction parameters
-LOOKBACK = 192
-HORIZON = 96
-NUM_TRAIN_SAMPLES = 3000 + LOOKBACK + HORIZON - 1
-NUM_TEST_SAMPLES = 1000 + LOOKBACK + HORIZON - 1
-
+LOOKBACK = 192 #number of past time steps used as input
+HORIZON = 96   #number of future time steps to predict 
+NUM_TRAIN_SAMPLES = 3000 + LOOKBACK + HORIZON - 1 #train samples
+NUM_TEST_SAMPLES = 1000 + LOOKBACK + HORIZON - 1  #test sapmles
 # %%
-# split data into train and test datasets
+# split the dataset into train and test sets then show the shapes of the resulting arrays
 train  = eu_df[:NUM_TRAIN_SAMPLES]['Germany (EUR/MWhe)'].to_numpy()
 test = eu_df[NUM_TRAIN_SAMPLES:NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES]['Germany (EUR/MWhe)'].to_numpy()
 print(f'Train dataset shape: {train.shape}\n'
@@ -46,31 +45,37 @@ print(f'Train dataset shape: {train.shape}\n'
 
 # %%
 # Scale the data (i.e. electricity prices)
+# Standardize the training and test datasets
 scaler = StandardScaler()
+# Fit the scaler on the training data 
 scaler.fit(train.reshape(-1, 1))
+# Apply the transformation and reshape back to 1D
 train_scaled = scaler.transform(train.reshape(-1, 1)).reshape(-1)
 test_scaled = scaler.transform(test.reshape(-1, 1)).reshape(-1)
 
+# Print statistics before and after scaling to verify standadization 
 print(f'Original Train dataset  mean: {round(train.mean(), 2)}; \tstd: {round(train.std(), 2)}\n'
       f'Scaled Train dataset    mean: {round(train_scaled.mean(), 2)}; \t\tstd: {round(train_scaled.std(), 2)}\n'
       f'Scaled Test dataset     mean: {round(test_scaled.mean(), 2)}; \tstd: {round(test_scaled.std(), 2)}\n')
 
 # %%
 # re-shape model into set of sequences,
+# Prepare sequential datasets for training and testing 
 train_input, train_true = sequentialize(train_scaled, LOOKBACK, HORIZON)
 test_input, test_true = sequentialize(test_scaled, LOOKBACK, HORIZON)
-
+# Convert arrays to Pytorch tensors
 train_input = torch.Tensor(train_input)
 train_true = torch.Tensor(train_true)
 test_input = torch.Tensor(test_input)
 test_true = torch.Tensor(test_true)
-
+# Display the shapes of the prepared datasets
 print('Shape of predictor inputs: ',train_input.shape)
 print('Shape of outputs: ',train_true.shape)
 print('Shape of test predictor inputs: ',test_input.shape)
 print('Shape of test outputs: ',test_true.shape)
 
 # %%
+# Convert scaled test data back to the original feature space ( Undo standardization)
 test_input_os = scaler.inverse_transform(test_input.numpy())
 test_true_os = scaler.inverse_transform(test_true.numpy())
 
@@ -89,24 +94,28 @@ np.savetxt('../data/trues.csv', test_true_os,delimiter=",")
 # ### 2.1 TSMixer
 
 # %%
+
+#Prepare DataLoaders for training and testing.
 train_loader = DataLoader(MTSMixerDataset(train_input.unsqueeze(-1), train_true), batch_size=32, shuffle=True)
 test_loader = DataLoader(MTSMixerDataset(test_input.unsqueeze(-1), test_true), batch_size=32)
 
 # %%
-# TO-DO: train TSMixer model and export predictions
+# Initialize the MTSMixer model 
 ts_mixer = MTSMixer(
-    num_variables= 1,
-    time_steps=LOOKBACK,
-    output_steps=HORIZON,
-    num_blocks=3,
-    hidden_dim=64,
-    activation='gelu'
+    num_variables= 1,    # Number of input variables
+    time_steps=LOOKBACK, # Length of the input sequence 
+    output_steps=HORIZON,# Number of steps to predict into the future
+    num_blocks=3,        # Number of mixer blocks in the architecture 
+    hidden_dim=64,       # Dimension of hidden layers inside the model 
+    activation='gelu'    # non-linear activation function used in the network
 )
 
 # %%
+#Train the MTSMixer model 
 ts_mixer.fit(train_loader, device='cpu', epochs=2, lr=1e-3)
 
 # %%
+# Generate prediction with the trained MTSMixer model 
 ts_mixer_preds, trues = ts_mixer.predict(test_loader, device='cpu')
 ts_mixer_preds_os = scaler.inverse_transform(ts_mixer_preds)
 
@@ -127,27 +136,31 @@ plot_predictions(
 # ### 2.2 PatchTST
 
 # %%
+# Prepare DataLoaders for the PatchTST model 
+
 train_loader_patch = DataLoader(PatchTSTDataset(train_input.unsqueeze(-1), train_true),
                                 batch_size=32, shuffle=True)
 test_loader_patch = DataLoader(PatchTSTDataset(test_input.unsqueeze(-1), test_true),
                                batch_size=32)
 
 # %%
-# TO-DO: train PatchTST model and export predictions
+# Initialize the PatchTST model
 patch_TST = PatchTST(
-    num_variables=1,  # number of variables in the time series
-    seq_len=LOOKBACK,
-    patch_size=16, # must be a divisor of LOOKBACK
-    embed_dim=128,  # embedding dimension
-    num_layers=3,
-    num_heads=4,
-    output_steps=HORIZON,
-    dropout=0.1
+    num_variables=1,     # Number of input features in the time series
+    seq_len=LOOKBACK,    # Length of the input sequence 
+    patch_size=16,       # Size of each patch (Must be a divisor of LOOKBACK )
+    embed_dim=128,       # Dimension of the embedding space
+    num_layers=3,        # Number of transformer encoder layers 
+    num_heads=4,         # Number of attention heads per layer
+    output_steps=HORIZON,# Number of future steps to predict  
+    dropout=0.1          # Dropout rate for regularization
 )
-
+# Train the patchTST model 
 patch_TST.fit(train_loader_patch, device='cpu', epochs=2, lr=1e-3)
 
 # %%
+# Generate predictions with the trained PatchTST model
+
 patch_TST_preds, trues = patch_TST.predict(test_loader_patch, device='cpu')
 patch_TST_preds_os = scaler.inverse_transform(patch_TST_preds)
 

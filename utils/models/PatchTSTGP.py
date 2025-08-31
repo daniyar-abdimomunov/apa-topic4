@@ -4,6 +4,10 @@ from utils.models.TSGP import TSGPModel
 from utils.models.PatchTST import PatchTST
 
 class PatchTSTFeatureExtractor(Module):
+    """
+    Simple PatchTST-based feature extractor to project inputs to a latent space for the GP
+    
+    """
     def __init__(self, num_variables, time_steps, latent_dimension=50, patch_size=16, embed_dim=128,
                  num_layers=3, num_heads=4, dropout=0.1):
         super().__init__()
@@ -15,6 +19,13 @@ class PatchTSTFeatureExtractor(Module):
         return self.patch_tst(x)  # (B, latent_dim)
 
 class PatchTSTGPModel(TSGPModel):
+    """
+
+    TSGP variant with a learnable PatchTST feature extractor :
+    - Projects inputs with PatchTSTFeatureExtractor
+    - Scales features to fixed bounds for stable GP behavior
+    
+    """
     def __init__(self, inducing_points, horizon, lookback, num_latents_svgp, grid_bounds=(-1., 1.), latent_dimension=50, patch_size=16, embed_dim=128,
                  num_layers=3, num_heads=4, dropout=0.1):
 

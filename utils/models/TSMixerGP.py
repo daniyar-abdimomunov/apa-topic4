@@ -6,6 +6,10 @@ from utils.models.TSMixer import MTSMixerBlock
 import torch
 
 class TSMixerFeatureExtractor(Module):
+    """
+    Simple TSMixer-based feature extractor to project inputs to a latent space for the GP
+    
+    """
     def __init__(self, num_variables, time_steps, latent_dimension, num_blocks=3, hidden_dim=64, activation='gelu'):
         super().__init__()
         self.blocks = ModuleList([
@@ -24,6 +28,13 @@ class TSMixerFeatureExtractor(Module):
         return x  # embedding instead of prediction
 
 class TSMixerGPModel(TSGPModel):
+    """
+
+    TSGP variant with a learnable TSMixer feature extractor :
+    - Projects inputs with TSMixerFeatureExtractor
+    - Scales features to fixed bounds for stable GP behavior
+
+    """
     def __init__(self, inducing_points, horizon, lookback, num_latents_svgp, num_latents_lfe,
                  grid_bounds=(-1., 1.), num_blocks=3, hidden_dim=64, activation='gelu'):
         

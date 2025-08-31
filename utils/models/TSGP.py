@@ -97,7 +97,7 @@ class TSGPModel(Module):
         x = x.reshape(x.size(0), -1)
         return self.gp_layer(x)
 
-    def train_model(
+    def fit(
             self,
             train_loader: DataLoader,
             num_data: int,
@@ -139,7 +139,7 @@ class TSGPModel(Module):
 
         return
 
-    def infer(
+    def predict(
             self,
             input: Tensor,
             true_shape = None

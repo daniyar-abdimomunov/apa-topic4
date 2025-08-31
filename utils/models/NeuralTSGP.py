@@ -42,11 +42,11 @@ class NeuralTSGPModel(TSGPModel):
 
         return super().forward(projected_x)
 
-    def train_model(self, *args, **kwargs):
+    def fit(self, *args, **kwargs):
         self.latent_feature_extractor.train()
-        super().train_model(add_optimizer_params=[{'params': self.latent_feature_extractor.parameters()}], *args,
-                            **kwargs)
+        super().fit(add_optimizer_params=[{'params': self.latent_feature_extractor.parameters()}], *args,
+                    **kwargs)
 
-    def infer(self, *args, **kwargs):
+    def predict(self, *args, **kwargs):
         self.latent_feature_extractor.eval()
-        return super().infer(*args, **kwargs)
+        return super().predict(*args, **kwargs)

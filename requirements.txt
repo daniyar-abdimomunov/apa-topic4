@@ -1,0 +1,14 @@
+gpytorch
+jupyter
+jupyterlab
+jupyterlab-git
+jupytext
+matplotlib
+pandas
+properscoring
+seaborn
+sentencepiece
+scipy
+scikit-learn
+torch
+transformers==4.40.1

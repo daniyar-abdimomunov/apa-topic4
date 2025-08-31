@@ -1,0 +1,10 @@
+[project]
+name = "apa-topic4"
+
+# Pair ipynb notebooks to py:percent text notebooks
+[tool.jupytext.formats]
+"notebooks/" = "ipynb"
+"scripts/" = "py:percent"
+
+[tool.jupytext]
+notebook_metadata_filter="-all"

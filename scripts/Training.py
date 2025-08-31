@@ -35,10 +35,10 @@ eu_df
 # %%
 # Define train-test split and prediction parameters
 # Forecasting setup
-LOOKBACK = 192
-HORIZON = 96
-NUM_TRAIN_SAMPLES = 3000 + LOOKBACK + HORIZON - 1
-NUM_TEST_SAMPLES = 1000 + LOOKBACK + HORIZON - 1
+LOOKBACK = 192 #number of historical hours per sample
+HORIZON = 96 #number of steps to predict ahead
+NUM_TRAIN_SAMPLES = 3000 + LOOKBACK + HORIZON - 1 # Define lengths of contigious trainn/test segments
+NUM_TEST_SAMPLES = 1000 + LOOKBACK + HORIZON - 1 # Ensures enough rows for windowing
 
 # %%
 # Split data into train and test datasets
@@ -48,7 +48,8 @@ print(f'Train dataset shape: {train.shape}\n'
       f'Test dataset shape: {test.shape}\n')
 
 # %%
-# Standardize by training distribution ; models work in scaled space
+# Fit a standardScaler on the flattened training data so both variable
+# share the same scaling
 scaler = StandardScaler()
 scaler.fit(train.reshape(-1, 1))
 train_scaled = scaler.transform(train.reshape(-1, 1)).reshape(train.shape)
@@ -59,23 +60,24 @@ print(f'Original Train dataset  mean: {round(train.mean(), 2)}; \tstd: {round(tr
       f'Scaled Test dataset     mean: {round(test_scaled.mean(), 2)}; \tstd: {round(test_scaled.std(), 2)}\n')
 
 # %%
-# Re-shape model of 1D series into a set of supervised sequences
+# Convert continious series to supervised windows for multistep forecasting
 train_input, train_true = sequentialize(train_scaled, LOOKBACK, HORIZON)
 test_input, test_true = sequentialize(test_scaled, LOOKBACK, HORIZON)
 
-# Torch tensors
+# Convert to tensors
 train_input = torch.Tensor(train_input)
-train_true = torch.Tensor(train_true[:, : , 0]) # we only want to make predictions for one of the countries, so we select the first one (i.e. Germany) as our true values
+train_true = torch.Tensor(train_true[:, :, 0]) # we only want to make predictions for one of the countries, so we select the first one (i.e. Germany) as our true values
 test_input = torch.Tensor(test_input)
-test_true = torch.Tensor(test_true[:, : , 0]) # we only want to make predictions for one of the countries, so we select the first one (i.e. Germany) as our true values
+test_true = torch.Tensor(test_true[:, :, 0]) # we only want to make predictions for one of the countries, so we select the first one (i.e. Germany) as our true values
 
-print('Shape of predictor inputs: ',train_input.shape)
-print('Shape of outputs: ',train_true.shape)
-print('Shape of test predictor inputs: ',test_input.shape)
-print('Shape of test outputs: ',test_true.shape)
+print('Shape of predictor inputs: ', train_input.shape)
+print('Shape of outputs: ', train_true.shape)
+print('Shape of test predictor inputs: ', test_input.shape)
+print('Shape of test outputs: ', test_true.shape)
 
 # %%
-# Store original-scale versions of test sequences for plotting/benchmarking
+# Keep original-scale copies of the test sequences for plotting and benchmaking
+# Inverse-transform by flattening to 2D when needed and reshaping back
 test_input_os = scaler.inverse_transform(test_input.reshape(test_input.shape[0], -1).numpy()).reshape(test_input.shape)
 test_true_os = scaler.inverse_transform(test_true.numpy())
 
@@ -95,7 +97,8 @@ train_loader = DataLoader(MTSMixerDataset(train_input, train_true), batch_size=3
 test_loader = DataLoader(MTSMixerDataset(test_input, test_true), batch_size=32)
 
 # %%
-# Initialize a small TSMixer and adjust hyperparameters
+# Initialize a compact TSMixer and train on CPU
+#Adjust hyperparameters/epochs as needed
 ts_mixer = MTSMixer(
     num_variables=train_input.size(-1),
     time_steps=LOOKBACK,
@@ -118,7 +121,7 @@ ts_mixer_preds_os = scaler.inverse_transform(ts_mixer_preds)
 np.save(os.path.join(DATA_DIR, 'ts_mixer_pred.npy'), ts_mixer_preds_os)
 
 # %%
-# visualize predictions and confidence interval
+# visualize predictions and confidence interval for a specific test case
 TEST_CASE = 567
 
 plot_predictions(
@@ -131,16 +134,17 @@ plot_predictions(
 # ### 2.2 PatchTST
 
 # %%
+# Seperate datasets/loaders due to patching specifics
 train_loader_patch = DataLoader(PatchTSTDataset(train_input, train_true), batch_size=32, shuffle=True)
 test_loader_patch = DataLoader(PatchTSTDataset(test_input, test_true), batch_size=32)
 
 # %%
-# TO-DO: train PatchTST model and export predictions
+# Configure PatchTST
 patch_TST = PatchTST(
-    num_variables=train_input.size(-1),  # number of variables in the time series
+    num_variables=train_input.size(-1),  # Number of variables in the time series
     seq_len=LOOKBACK,
-    patch_size=16, # must be a divisor of LOOKBACK
-    embed_dim=128,  # embedding dimension
+    patch_size=16, # Must be a divisor of LOOKBACK
+    embed_dim=128,  # Embedding dimension
     num_layers=3,
     num_heads=4,
     output_steps=HORIZON,
@@ -148,6 +152,7 @@ patch_TST = PatchTST(
 )
 
 # %%
+# Train and predict
 patch_TST.fit(train_loader_patch, device='cpu', epochs=15, lr=1e-3)
 
 # %%
@@ -169,11 +174,13 @@ plot_predictions(
 
 # %% [markdown]
 # ### 2.3 Sundial Model
-# Sundial is a pre-trained model for Time-Series Forecasting.
+# Sundial is a pre-trained TS model for Time-Series Forecasting.
+# We generate multiple samples per test case to form a predictive distribution , then compute mean and 95% CI
 # This section is adapted from the [quickstart_zero_shot.ipynb](https://github.com/thuml/Sundial/blob/main/examples/quickstart_zero_shot.ipynb) provided by the developers of the Sundial Model.
 
 # %%
-# load model and dataset
+
+# Load model and dataset
 model = AutoModelForCausalLM.from_pretrained('thuml/sundial-base-128m', trust_remote_code=True)
 
 # %%
@@ -194,12 +201,13 @@ print(f'Predictions shape: {forecast.shape}\n'
       f'{forecast.shape[2]} - predicted time-steps (i.e. prediction horizon)\n')
 
 # %%
-# separate predictions and confidence interval
+# Compute mean and 95% interval in scaled space , then invert the scaling
 sundial_preds = scaler.inverse_transform(forecast.mean(dim=1))
 sundial_lowers = scaler.inverse_transform(forecast.quantile(q=0.025, dim=1))
 sundial_uppers = scaler.inverse_transform(forecast.quantile(q=0.975, dim=1))
 
 # %%
+# Save Sundial outputs
 # export forecast outputs for benchmarking
 np.save('../data/sundial_preds.npy', sundial_preds)
 np.save('../data/sundial_lowers.npy', sundial_lowers)
@@ -236,6 +244,7 @@ plot_predictions(
 # This section adapts the model implementation using GPyTorch's variational framework.
 
 # %%
+# Setup fo SVGP models : inducing points , latents , and a smaller batch size
 train_dataset = TensorDataset(train_input, train_true)
 train_loader_svgp = DataLoader(train_dataset, batch_size=16, shuffle=True) # batch_size (M), batch shape = ([M, L, V0], [M, H, V1])
 
@@ -248,18 +257,20 @@ inducing_points = train_input[:NUM_INDUCING_POINTS]
 # ### 3.1 Base Multistep SVGP
 
 # %%
-# subset of training inputs
+# A sparse variational GP that maps from the sequence inputs to Horizon outputs
 tsgp_model = TSGPModel(inducing_points, HORIZON, num_latents_svgp=NUM_LATENTS_SVGP)
 
 # %%
+# Train GP model
 tsgp_model.fit(train_loader_svgp, num_data=train_input.size(0), epochs=100)
 
 # %%
-# Inference with TSGP
+# Inference with TSGP in scaled space with means /lower / upper
 tsgp_preds, tsgp_lowers, tsgp_uppers = tsgp_model.predict(test_input, true_shape=test_true.shape)
 
 # %%
 # separate predictions and confidence interval
+# Inverse transform to original scale for saving and plotting
 tsgp_preds = scaler.inverse_transform(tsgp_preds.detach().numpy())
 tsgp_lowers = scaler.inverse_transform(tsgp_lowers.detach().numpy())
 tsgp_uppers = scaler.inverse_transform(tsgp_uppers.detach().numpy())
@@ -289,9 +300,11 @@ plot_predictions(
 #  This section extends the plain TSGP (3.1) by adding a deep feature extractor before the GP layer.
 
 # %%
-# training
+# Adds a deep feature extractor before the GP layer for richer representations
+
 NUM_LATENTS_LFE = 16
-neural_tsgp = NeuralTSGPModel(inducing_points, HORIZON, num_latents_svgp=NUM_LATENTS_SVGP, num_latents_lfe=NUM_LATENTS_LFE)
+neural_tsgp = NeuralTSGPModel(inducing_points, HORIZON, num_latents_svgp=NUM_LATENTS_SVGP,
+                              num_latents_lfe=NUM_LATENTS_LFE)
 
 # %%
 neural_tsgp.fit(train_loader_svgp, num_data=train_input.size(0), epochs=25)
@@ -328,7 +341,8 @@ plot_predictions(
 # ### 3.3 PatchTST Extension for Time-series GP Model
 
 # %%
-# training
+# Uses PatchTST as a feature extractor feeding a gp head
+
 patch_tst_gp = PatchTSTGPModel(inducing_points, HORIZON, LOOKBACK, num_latents_svgp=NUM_LATENTS_SVGP, num_layers=6, embed_dim=8)
 
 # %%
@@ -364,11 +378,10 @@ plot_predictions(
 
 # %% [markdown]
 # ### 2.6.4 TSMixer Extension for Time-series GP Model
- 
-# %%
-# training
-ts_mixer_gp = TSMixerGPModel(inducing_points, horizon=HORIZON, lookback=LOOKBACK, num_latents_svgp=NUM_LATENTS_SVGP, num_latents_lfe=NUM_LATENTS_LFE)
 
+# %%
+# Uses TSMixer encoder with a GP head for probabilistic outputs
+ts_mixer_gp = TSMixerGPModel(inducing_points, horizon=HORIZON, lookback=LOOKBACK, num_latents_svgp=NUM_LATENTS_SVGP, num_latents_lfe=NUM_LATENTS_LFE)
 
 # %%
 ts_mixer_gp.fit(train_loader_svgp, num_data=train_input.size(0), epochs=10)

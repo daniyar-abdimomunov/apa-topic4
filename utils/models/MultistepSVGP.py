@@ -13,15 +13,35 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 class MultistepSVGP(ApproximateGP):
+    """
+    Extends GPyTorch's ApproximateGP for multi-step time-series
+    forecasting using a sparse variational approach. It combines a base
+    variational strategy with an LMC (Linear Model of Coregionalization)
+    strategy to handle multiple forecast horizons simultaneously.
+
+    Args:
+        inducing_points (Tensor): Initial inducing point locations,
+            shape (M, D) where M = number of inducing points and D = input dimension
+        horizon (int): Number of future steps to predict (multi-task outputs)
+        num_latents_svgp (int): Number of latent GPs to use in the LMC variational strategy
+
+    Attributes:
+        mean_module (gpytorch.means.Mean): Constant mean function
+        covar_module (gpytorch.kernels.Kernel): Scaled RBF kernel with ARD
+        variational_strategy (gpytorch.variational.VariationalStrategy):
+            Wraps the variational distribution and defines the approximate inference
+    """
     def __init__(self, inducing_points, horizon, num_latents_svgp):
-        # Variational distribution over inducing points (full covariance)
+        # Number of inducing point (M)
         num_inducing_points = inducing_points.size(0) # num_inducing_points (P) ≤ total number of samples (N)
+
+        # Variational distribution for inducing points , batched across Latent GPs
         variational_dist = CholeskyVariationalDistribution(
             num_inducing_points,
             batch_shape=Size([num_latents_svgp])
         )
 
-        # Base variational strategy (shared inducing points)
+        # Base variational strategy approximates the GP using a small set of inducing points
         base_var_strategy = VariationalStrategy(
             self,  # model reference
             inducing_points,
@@ -44,14 +64,30 @@ class MultistepSVGP(ApproximateGP):
         self.covar_module = ScaleKernel(RBFKernel(ard_num_dims=input_dim))
 
     def forward(self, x):
-        # x should have shape [batch_size (M), input_dim (d0)]
+        """
+        Forward pass of the GP model :
+
+        Args :
+        x (Tensor) : Input data of shape (N= number of data points , D=input dimension)
+
+        Returns:
+        - mean_x (Tensor): mean vector from the mean module
+        - covar_x(Tensor): covariance matrix from the kernel
+        """
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         return MultivariateNormal(mean_x, covar_x)
 
 class TSGPModel(Module):
+    """
+    Time-Series GP (TSGP) wrapper:
+    - Flattens sequences
+    - Trains with variational ELBO
+    - Infers mean + confidence region per horizon step
+    """
     def __init__(self, inducing_points, horizon, num_latents_svgp):
         super().__init__()
+        # Flatten inducing points to (M, D)
         inducing_points = inducing_points.reshape(inducing_points.size(0), -1)
         self.gp_layer = MultistepSVGP(inducing_points, horizon, num_latents_svgp)
         self.likelihood = MultitaskGaussianLikelihood(num_tasks=horizon)
@@ -67,6 +103,7 @@ class TSGPModel(Module):
             num_data: int,
             epochs: int = 25,
             add_optimizer_params: list = []):
+        # Variational training with ELBO over (gp_layer + likelihood)
         self.gp_layer.train()
         self.likelihood.train()
 
@@ -107,6 +144,19 @@ class TSGPModel(Module):
             input: Tensor,
             true_shape = None
     ):
+        """
+        Predict mean and confidence
+
+        Args:
+          x_test (Tensor) : Test inputs of shape
+          true_shape : If provided , the outputs will be reshaped to this size
+
+        Returns:
+          preds : Predicted mean values
+          lowers: Lower bound of the confidence interval
+          uppers: Upper bound of the confidence interval
+
+        """
         self.gp_layer.eval()
         self.likelihood.eval()
 
